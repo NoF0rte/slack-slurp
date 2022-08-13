@@ -1,11 +1,14 @@
 package slurp
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 
 	"github.com/NoF0rte/slack-slurp/pkg/config"
+	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/slack-go/slack"
 )
 
@@ -47,7 +50,7 @@ func New(cfg *config.Config) Slurper {
 	}
 }
 
-func (s Slurper) searchMessages(query string) ([]string, error) {
+func (s Slurper) SearchMessages(query string) ([]string, error) {
 	params := slack.NewSearchParameters()
 	search, err := s.client.SearchMessages(query, params)
 	if err != nil {
@@ -98,7 +101,7 @@ func (s Slurper) GetUsers() ([]User, error) {
 func (s Slurper) GetSecrets() ([]string, error) {
 	var allSecrets []string
 	for _, keyword := range s.config.Secrets {
-		secrets, err := s.searchMessages(keyword)
+		secrets, err := s.SearchMessages(keyword)
 		if err != nil {
 			return nil, err
 		}
@@ -106,4 +109,30 @@ func (s Slurper) GetSecrets() ([]string, error) {
 		allSecrets = append(allSecrets, secrets...)
 	}
 	return allSecrets, nil
+}
+
+func (s Slurper) GetDomains() ([]string, error) {
+	domainSet := treeset.NewWithStringComparator()
+	for _, domain := range s.config.Domains {
+		messages, err := s.SearchMessages(domain)
+		if err != nil {
+			return nil, err
+		}
+
+		regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
+		for _, message := range messages {
+			matches := regex.FindAllString(message, -1)
+
+			for _, match := range matches {
+				domainSet.Add(match)
+			}
+		}
+	}
+
+	var allDomains []string
+	for _, domain := range domainSet.Values() {
+		allDomains = append(allDomains, domain.(string))
+	}
+
+	return allDomains, nil
 }

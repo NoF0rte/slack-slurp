@@ -1,8 +1,9 @@
 package config
 
 type Config struct {
-	SlackToken       string   `mapstructure:"slack-token"`
-	SlackCookie      string   `mapstructure:"slack-cookie"`
-	InterestingFiles []string `mapstructure:"interesting-files"`
-	Secrets          []string `mapstructure:"secrets"`
+	SlackToken  string   `mapstructure:"slack-token"`
+	SlackCookie string   `mapstructure:"slack-cookie"`
+	Files       []string `mapstructure:"files"`
+	Secrets     []string `mapstructure:"secrets"`
+	Domains     []string `mapstructure:"domains"`
 }

@@ -24,11 +24,18 @@ var allSlurps = []string{
 }
 
 var cfgFile string
+var slurper slurp.Slurper
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "slack-slurp",
-	Short: "A brief description of your application",
+	Short: "Slurp juicy slack related info",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		var cfg config.Config
+		viper.Unmarshal(&cfg)
+
+		slurper = slurp.New(&cfg)
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		slurpSet := treeset.NewWithStringComparator()
 
@@ -51,11 +58,6 @@ var rootCmd = &cobra.Command{
 				slurpSet.Add(strings.TrimSpace(s))
 			}
 		}
-
-		var cfg config.Config
-		viper.Unmarshal(&cfg)
-
-		slurper := slurp.New(&cfg)
 
 		for _, v := range slurpSet.Values() {
 			switch v.(string) {
@@ -83,6 +85,18 @@ var rootCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+			case "domains":
+				fmt.Println("[+] Slurping Domains...")
+
+				domains, err := slurper.GetDomains()
+				if err != nil {
+					return err
+				}
+
+				err = util.WriteLines("slurp-domains.txt", domains)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -101,21 +115,25 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.slack-slurp.yaml)")
+	rootCmd.PersistentFlags().StringP("token", "t", "", "Slack Workspace token. The token should start with XOXC.")
+	rootCmd.PersistentFlags().StringP("cookie", "c", "", "Slack Workspace cookie. The token should start with XOXD.")
 
-	rootCmd.Flags().StringP("token", "t", "", "Slack Workspace token. The token should start with XOXC.")
-	rootCmd.Flags().StringP("cookie", "c", "", "Slack Workspace cookie. The token should start with XOXD.")
+	viper.BindPFlag("slack-token", rootCmd.PersistentFlags().Lookup("token"))
+	viper.BindPFlag("slack-cookie", rootCmd.PersistentFlags().Lookup("cookie"))
+
 	rootCmd.Flags().StringSliceP("slurp", "s", []string{"all"}, fmt.Sprintf("What to slurp. [%s]", strings.Join(allSlurps, ",")))
 	rootCmd.RegisterFlagCompletionFunc("slurp", cobra.FixedCompletions(allSlurps, cobra.ShellCompDirectiveDefault))
-
-	viper.BindPFlag("slack-token", rootCmd.Flags().Lookup("token"))
-	viper.BindPFlag("slack-cookie", rootCmd.Flags().Lookup("cookie"))
 }
 
 func initConfig() {
 
 	setConfigDefault("secrets", []string{
 		"password",
+		"passwd",
+		"AKIA",
+		"ASIA",
 	})
+	setConfigDefault("domains", []string{})
 	setConfigDefault("slack-token", "")
 	setConfigDefault("slack-cookie", "")
 
