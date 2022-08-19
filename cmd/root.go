@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/NoF0rte/slack-slurp/internal/util"
-	"github.com/NoF0rte/slack-slurp/pkg/config"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/spf13/cobra"
@@ -18,7 +17,7 @@ import (
 var allSlurps = []string{
 	"all",
 	"users",
-	"links",
+	// "links",
 	"domains",
 	"secrets",
 }
@@ -31,7 +30,7 @@ var rootCmd = &cobra.Command{
 	Use:   "slack-slurp",
 	Short: "Slurp juicy slack related info",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		var cfg config.Config
+		var cfg slurp.Config
 		viper.Unmarshal(&cfg)
 
 		slurper = slurp.New(&cfg)
@@ -126,13 +125,38 @@ func init() {
 }
 
 func initConfig() {
-
-	setConfigDefault("secrets", []string{
-		"password",
-		"passwd",
-		"AKIA",
-		"ASIA",
+	setConfigDefault("detectors", []string{
+		"auth0managementapitoken",
+		"aws",
+		"azure",
+		"censys",
+		"cloudflareapitoken",
+		"cloudflarecakey",
+		"digitaloceantoken",
+		"discordbottoken",
+		"discordwebhook",
+		"dropbox",
+		"gcp",
+		"generic",
+		"github",
+		"github_old",
+		"githubapp",
+		"gitlab",
+		"gitlabv2",
+		"heroku",
+		"jiratoken",
+		"microsoftteamswebhook",
+		"okta",
+		"pastebin",
+		"privatekey",
+		"shodankey",
+		"slack",
+		"slackwebhook",
+		"terraformcloudpersonaltoken",
+		"uri",
+		"urlscan",
 	})
+
 	setConfigDefault("domains", []string{})
 	setConfigDefault("slack-token", "")
 	setConfigDefault("slack-cookie", "")

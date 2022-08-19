@@ -1,15 +1,16 @@
 package slurp
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
 
-	"github.com/NoF0rte/slack-slurp/pkg/config"
 	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/slack-go/slack"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
 type User struct {
@@ -24,11 +25,12 @@ type User struct {
 }
 
 type Slurper struct {
-	client *slack.Client
-	config *config.Config
+	client    *slack.Client
+	config    *Config
+	detectors []detectors.Detector
 }
 
-func New(cfg *config.Config) Slurper {
+func New(cfg *Config) Slurper {
 	jar, _ := cookiejar.New(nil)
 	url, _ := url.Parse("https://slack.com")
 	jar.SetCookies(url, []*http.Cookie{
@@ -45,8 +47,9 @@ func New(cfg *config.Config) Slurper {
 	}
 
 	return Slurper{
-		client: slack.New(cfg.SlackToken, slack.OptionHTTPClient(client)),
-		config: cfg,
+		client:    slack.New(cfg.SlackToken, slack.OptionHTTPClient(client)),
+		config:    cfg,
+		detectors: getDetectors(cfg.Detectors),
 	}
 }
 
@@ -69,6 +72,32 @@ func (s Slurper) SearchMessages(query string) ([]string, error) {
 		}
 
 		search, err = s.client.SearchMessages(query, params)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return matches, nil
+}
+
+func (s Slurper) SearchFiles(query string) ([]string, error) {
+	params := slack.NewSearchParameters()
+	search, err := s.client.SearchFiles(query, params)
+	if err != nil {
+		return nil, err
+	}
+
+	var matches []string
+	for {
+		for _, match := range search.Matches {
+			matches = append(matches, match.URLPrivateDownload)
+		}
+
+		params.Page++
+		if params.Page > search.Paging.Pages {
+			break
+		}
+
+		search, err = s.client.SearchFiles(query, params)
 		if err != nil {
 			return nil, err
 		}
@@ -100,13 +129,25 @@ func (s Slurper) GetUsers() ([]User, error) {
 
 func (s Slurper) GetSecrets() ([]string, error) {
 	var allSecrets []string
-	for _, keyword := range s.config.Secrets {
-		secrets, err := s.SearchMessages(keyword)
-		if err != nil {
-			return nil, err
-		}
+	for _, detector := range s.detectors {
+		keywords := detector.Keywords()
+		for _, keyword := range keywords {
+			messages, err := s.SearchMessages(keyword)
+			if err != nil {
+				return nil, err
+			}
 
-		allSecrets = append(allSecrets, secrets...)
+			for _, message := range messages {
+				results, err := detector.FromData(context.Background(), false, []byte(message))
+				if err != nil {
+					return nil, err
+				}
+
+				if len(results) > 0 {
+					allSecrets = append(allSecrets, message)
+				}
+			}
+		}
 	}
 	return allSecrets, nil
 }
