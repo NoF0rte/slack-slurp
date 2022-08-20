@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -119,19 +118,17 @@ var rootCmd = &cobra.Command{
 				}
 				defer file.Close()
 
-				writer := bufio.NewWriter(file)
-
 				domainChan, errorChan := slurper.GetDomainsChan()
 
-			Loop:
+			DomainLoop:
 				for {
 					select {
 					case domain, ok := <-domainChan:
 						if !ok {
-							break Loop
+							break DomainLoop
 						}
-						writer.WriteString(domain + "\n")
-						writer.Flush() // Flush so the file can be written as we find domains
+
+						fmt.Fprintln(file, domain)
 					case err = <-errorChan:
 						close(domainChan)
 					}
