@@ -2,6 +2,7 @@ package slurp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -22,6 +23,27 @@ type User struct {
 	IsAdmin   bool
 	IsBot     bool
 	Deleted   bool
+}
+
+type Secret struct {
+	// Raw contains the raw secret identifier data.
+	Raw      string
+	Verified bool
+}
+
+type SecretResult struct {
+	Type    string
+	Message string
+	Secrets []Secret
+}
+
+func (s SecretResult) ToJson() (string, error) {
+	bytes, err := json.MarshalIndent(&s, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
 }
 
 type Slurper struct {
@@ -127,29 +149,75 @@ func (s Slurper) GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func (s Slurper) GetSecrets() ([]string, error) {
-	var allSecrets []string
-	for _, detector := range s.detectors {
-		keywords := detector.Keywords()
-		for _, keyword := range keywords {
-			messages, err := s.SearchMessages(keyword)
-			if err != nil {
-				return nil, err
-			}
+func (s Slurper) GetSecrets() ([]SecretResult, error) {
+	var err error
+	var allSecrets []SecretResult
 
-			for _, message := range messages {
-				results, err := detector.FromData(context.Background(), false, []byte(message))
+	secretChan, errorChan := s.GetSecretsChan()
+
+Loop:
+	for {
+		select {
+		case secret, ok := <-secretChan:
+			if !ok {
+				break Loop
+			}
+			allSecrets = append(allSecrets, secret)
+		case err = <-errorChan:
+			close(secretChan)
+		}
+	}
+	close(errorChan)
+
+	return allSecrets, err
+}
+
+func (s Slurper) GetSecretsChan() (chan SecretResult, chan error) {
+	secretChan := make(chan SecretResult)
+	errorChan := make(chan error)
+
+	go func() {
+		for _, detector := range s.detectors {
+			keywords := detector.Keywords()
+			for _, keyword := range keywords {
+				messages, err := s.SearchMessages(keyword)
 				if err != nil {
-					return nil, err
+					errorChan <- err
+					return
 				}
 
-				if len(results) > 0 {
-					allSecrets = append(allSecrets, message)
+				for _, message := range messages {
+					results, err := detector.FromData(context.Background(), false, []byte(message))
+					if err != nil {
+						errorChan <- err
+						return
+					}
+
+					if len(results) == 0 {
+						continue
+					}
+
+					var secrets []Secret
+					for _, result := range results {
+						secrets = append(secrets, Secret{
+							Raw:      string(result.Raw),
+							Verified: result.Verified,
+						})
+					}
+
+					secretChan <- SecretResult{
+						Message: message,
+						Type:    results[0].DetectorType.String(),
+						Secrets: secrets,
+					}
 				}
 			}
 		}
-	}
-	return allSecrets, nil
+
+		close(secretChan)
+	}()
+
+	return secretChan, errorChan
 }
 
 func (s Slurper) GetDomains() ([]string, error) {

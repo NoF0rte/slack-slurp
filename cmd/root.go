@@ -76,15 +76,40 @@ var rootCmd = &cobra.Command{
 			case "secrets":
 				fmt.Println("[+] Slurping Secrets...")
 
-				secrets, err := slurper.GetSecrets()
+				file, err := os.Create("slurp-secrets.json")
+				if err != nil {
+					return err
+				}
+				defer file.Close()
+
+				secretChan, errorChan := slurper.GetSecretsChan()
+
+			SecretLoop:
+				for {
+					select {
+					case secret, ok := <-secretChan:
+						if !ok {
+							break SecretLoop
+						}
+
+						output, err := secret.ToJson()
+						if err != nil {
+							close(secretChan)
+							close(errorChan)
+							return err
+						}
+
+						fmt.Fprintln(file, output)
+					case err = <-errorChan:
+						close(secretChan)
+					}
+				}
+				close(errorChan)
+
 				if err != nil {
 					return err
 				}
 
-				err = util.WriteLines("slurp-secrets.txt", secrets)
-				if err != nil {
-					return err
-				}
 			case "domains":
 				fmt.Println("[+] Slurping Domains...")
 
