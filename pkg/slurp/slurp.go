@@ -14,6 +14,24 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
+type ChannelType string
+
+const (
+	ChannelPublic        ChannelType = "public_channel"
+	ChannelPrivate       ChannelType = "private_channel"
+	ChannelDirectMessage ChannelType = "im"
+	ChannelGroupMessage  ChannelType = "mpim"
+)
+
+type Channel struct {
+	ID             string
+	Name           string
+	IsPrivate      bool
+	IsGroup        bool
+	IsDM           bool
+	IsGroupMessage bool
+}
+
 type User struct {
 	FirstName string
 	LastName  string
@@ -306,4 +324,45 @@ func (s Slurper) GetDomainsChan() (chan string, chan error) {
 	}()
 
 	return domainChan, errorChan
+}
+
+func (s Slurper) GetChannels(channelTypes ...ChannelType) ([]Channel, error) {
+	var allChannels []Channel
+	var types []string
+	for _, t := range channelTypes {
+		types = append(types, string(t))
+	}
+
+	params := &slack.GetConversationsParameters{
+		Types: types,
+	}
+	channels, cursor, err := s.client.GetConversations(params)
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		for _, channel := range channels {
+			allChannels = append(allChannels, Channel{
+				ID:             channel.ID,
+				Name:           channel.Name,
+				IsPrivate:      channel.IsPrivate,
+				IsGroup:        channel.IsGroup,
+				IsDM:           channel.IsIM,
+				IsGroupMessage: channel.IsMpIM,
+			})
+		}
+
+		if cursor == "" {
+			break
+		}
+
+		params.Cursor = cursor
+
+		channels, cursor, err = s.client.GetConversations(params)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return allChannels, nil
 }
