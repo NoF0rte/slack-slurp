@@ -153,27 +153,58 @@ func (s Slurper) GetSecrets() ([]string, error) {
 }
 
 func (s Slurper) GetDomains() ([]string, error) {
-	domainSet := treeset.NewWithStringComparator()
-	for _, domain := range s.config.Domains {
-		messages, err := s.SearchMessages(domain)
-		if err != nil {
-			return nil, err
+	domainChan, errorChan := s.GetDomainsChan()
+
+	var err error
+	var allDomains []string
+
+Loop:
+	for {
+		select {
+		case domain, ok := <-domainChan:
+			if !ok {
+				break Loop
+			}
+			allDomains = append(allDomains, domain)
+		case err = <-errorChan:
+			close(domainChan)
 		}
+	}
+	close(errorChan)
 
-		regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
-		for _, message := range messages {
-			matches := regex.FindAllString(message, -1)
+	return allDomains, err
+}
 
-			for _, match := range matches {
-				domainSet.Add(match)
+func (s Slurper) GetDomainsChan() (chan string, chan error) {
+	domainChan := make(chan string)
+	errorChan := make(chan error)
+
+	go func() {
+		domainSet := treeset.NewWithStringComparator()
+		for _, domain := range s.config.Domains {
+			messages, err := s.SearchMessages(domain)
+			if err != nil {
+				errorChan <- err
+				return
+			}
+
+			regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
+			for _, message := range messages {
+				matches := regex.FindAllString(message, -1)
+
+				for _, match := range matches {
+					if domainSet.Contains(match) {
+						continue
+					}
+
+					domainSet.Add(match)
+					domainChan <- match
+				}
 			}
 		}
-	}
 
-	var allDomains []string
-	for _, domain := range domainSet.Values() {
-		allDomains = append(allDomains, domain.(string))
-	}
+		close(domainChan)
+	}()
 
-	return allDomains, nil
+	return domainChan, errorChan
 }

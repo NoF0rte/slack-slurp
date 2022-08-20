@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -87,12 +88,31 @@ var rootCmd = &cobra.Command{
 			case "domains":
 				fmt.Println("[+] Slurping Domains...")
 
-				domains, err := slurper.GetDomains()
+				file, err := os.Create("slurp-domains.txt")
 				if err != nil {
 					return err
 				}
+				defer file.Close()
 
-				err = util.WriteLines("slurp-domains.txt", domains)
+				writer := bufio.NewWriter(file)
+
+				domainChan, errorChan := slurper.GetDomainsChan()
+
+			Loop:
+				for {
+					select {
+					case domain, ok := <-domainChan:
+						if !ok {
+							break Loop
+						}
+						writer.WriteString(domain + "\n")
+						writer.Flush() // Flush so the file can be written as we find domains
+					case err = <-errorChan:
+						close(domainChan)
+					}
+				}
+				close(errorChan)
+
 				if err != nil {
 					return err
 				}
