@@ -30,7 +30,6 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/slackwebhook"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/terraformcloudpersonaltoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uri"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/urlscan"
 )
 
 func getDetectors(types []string) []detectors.Detector {
@@ -94,8 +93,6 @@ func getDetectors(types []string) []detectors.Detector {
 			detector = terraformcloudpersonaltoken.Scanner{}
 		case "uri":
 			detector = uri.Scanner{}
-		case "urlscan":
-			detector = urlscan.Scanner{}
 		}
 
 		if detector != nil {

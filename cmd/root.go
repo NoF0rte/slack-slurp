@@ -196,7 +196,6 @@ func initConfig() {
 		"slackwebhook",
 		"terraformcloudpersonaltoken",
 		"uri",
-		"urlscan",
 	})
 
 	setConfigDefault("domains", []string{})
