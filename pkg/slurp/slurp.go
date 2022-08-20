@@ -76,29 +76,60 @@ func New(cfg *Config) Slurper {
 }
 
 func (s Slurper) SearchMessages(query string) ([]string, error) {
-	params := slack.NewSearchParameters()
-	search, err := s.client.SearchMessages(query, params)
-	if err != nil {
-		return nil, err
-	}
+	var err error
+	var messages []string
 
-	var matches []string
+	messageChan, errorChan := s.SearchMessagesChan(query)
+
+Loop:
 	for {
-		for _, match := range search.Matches {
-			matches = append(matches, match.Text)
-		}
-
-		params.Page++
-		if params.Page > search.Paging.Pages {
-			break
-		}
-
-		search, err = s.client.SearchMessages(query, params)
-		if err != nil {
-			return nil, err
+		select {
+		case message, ok := <-messageChan:
+			if !ok {
+				break Loop
+			}
+			messages = append(messages, message)
+		case err = <-errorChan:
+			close(messageChan)
 		}
 	}
-	return matches, nil
+	close(errorChan)
+
+	return messages, err
+}
+
+func (s Slurper) SearchMessagesChan(query string) (chan string, chan error) {
+	params := slack.NewSearchParameters()
+	messageChan := make(chan string)
+	errorChan := make(chan error)
+
+	go func() {
+		search, err := s.client.SearchMessages(query, params)
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
+		for {
+			for _, match := range search.Matches {
+				messageChan <- match.Text
+			}
+
+			params.Page++
+			if params.Page > search.Paging.Pages {
+				break
+			}
+
+			search, err = s.client.SearchMessages(query, params)
+			if err != nil {
+				errorChan <- err
+				return
+			}
+		}
+		close(messageChan)
+	}()
+
+	return messageChan, errorChan
 }
 
 func (s Slurper) SearchFiles(query string) ([]string, error) {

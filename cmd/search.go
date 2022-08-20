@@ -13,17 +13,28 @@ var searchCmd = &cobra.Command{
 	Short: "Search slack messages",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+
 		query := strings.Join(args, " ")
-		matches, err := slurper.SearchMessages(query)
-		if err != nil {
-			return err
-		}
+		messageChan, errorChan := slurper.SearchMessagesChan(query)
 
-		for _, match := range matches {
-			fmt.Println(match)
-		}
+	Loop:
+		for {
+			select {
+			case message, ok := <-messageChan:
+				if !ok {
+					break Loop
+				}
 
-		return nil
+				fmt.Println(message)
+
+			case err = <-errorChan:
+				close(messageChan)
+			}
+		}
+		close(errorChan)
+
+		return err
 	},
 }
 
