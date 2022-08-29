@@ -139,6 +139,11 @@ func (s Slurper) SearchMessagesChan(query string) (chan string, chan error) {
 			}
 
 			search, err = s.client.SearchMessages(query, params)
+			if err != nil && err.Error() == "internal_error" {
+				params.Page++
+				search, err = s.client.SearchMessages(query, params)
+			}
+
 			if err != nil {
 				errorChan <- err
 				return
@@ -227,38 +232,51 @@ func (s Slurper) GetSecretsChan() (chan SecretResult, chan error) {
 
 	go func() {
 		for _, detector := range s.detectors {
+			var err error
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
-				messages, err := s.SearchMessages(keyword)
+				messageChan, err2Chan := s.SearchMessagesChan(keyword)
+
+			Loop:
+				for {
+					select {
+					case message, ok := <-messageChan:
+						if !ok {
+							break Loop
+						}
+
+						results, err := detector.FromData(context.Background(), false, []byte(message))
+						if err != nil {
+							errorChan <- err
+							return
+						}
+
+						if len(results) == 0 {
+							continue
+						}
+
+						var secrets []Secret
+						for _, result := range results {
+							secrets = append(secrets, Secret{
+								Raw:      string(result.Raw),
+								Verified: result.Verified,
+							})
+						}
+
+						secretChan <- SecretResult{
+							Message: message,
+							Type:    results[0].DetectorType.String(),
+							Secrets: secrets,
+						}
+					case err = <-err2Chan:
+						close(messageChan)
+					}
+				}
+				close(err2Chan)
+
 				if err != nil {
 					errorChan <- err
 					return
-				}
-
-				for _, message := range messages {
-					results, err := detector.FromData(context.Background(), false, []byte(message))
-					if err != nil {
-						errorChan <- err
-						return
-					}
-
-					if len(results) == 0 {
-						continue
-					}
-
-					var secrets []Secret
-					for _, result := range results {
-						secrets = append(secrets, Secret{
-							Raw:      string(result.Raw),
-							Verified: result.Verified,
-						})
-					}
-
-					secretChan <- SecretResult{
-						Message: message,
-						Type:    results[0].DetectorType.String(),
-						Secrets: secrets,
-					}
 				}
 			}
 		}
