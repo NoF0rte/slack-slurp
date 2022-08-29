@@ -299,24 +299,36 @@ func (s Slurper) GetDomainsChan() (chan string, chan error) {
 	go func() {
 		domainSet := treeset.NewWithStringComparator()
 		for _, domain := range s.config.Domains {
-			messages, err := s.SearchMessages(domain)
+			var err error
+			regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
+			messageChan, err2Chan := s.SearchMessagesChan(domain)
+
+		Loop:
+			for {
+				select {
+				case message, ok := <-messageChan:
+					if !ok {
+						break Loop
+					}
+					matches := regex.FindAllString(message, -1)
+
+					for _, match := range matches {
+						if domainSet.Contains(match) {
+							continue
+						}
+
+						domainSet.Add(match)
+						domainChan <- match
+					}
+				case err = <-err2Chan:
+					close(messageChan)
+				}
+			}
+			close(err2Chan)
+
 			if err != nil {
 				errorChan <- err
 				return
-			}
-
-			regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
-			for _, message := range messages {
-				matches := regex.FindAllString(message, -1)
-
-				for _, match := range matches {
-					if domainSet.Contains(match) {
-						continue
-					}
-
-					domainSet.Add(match)
-					domainChan <- match
-				}
 			}
 		}
 
