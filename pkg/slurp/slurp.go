@@ -235,7 +235,7 @@ func (s Slurper) GetSecretsChan() (chan SecretResult, chan error) {
 			var err error
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
-				messageChan, err2Chan := s.SearchMessagesChan(keyword)
+				messageChan, err2Chan := s.SearchMessagesChan(fmt.Sprintf("%s*", keyword))
 
 			Loop:
 				for {
