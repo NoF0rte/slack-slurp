@@ -1,9 +1,58 @@
 # Slack-Slurp
-What is slack-slurp? Slack-slurp is a pentesting social post-exploitation tool for slack. It uses Slack's API to search through messages and [trufflehog's](https://github.com/trufflesecurity/trufflehog) secrets detectors to slurp up any juicy information. If you are truly interested in using this and would like more documentation, let me know. I will try to write more detailed documentation as soon as I can and letting me know could potentially speed up the process.
+What is slack-slurp? Slack-slurp is a pentesting social post-exploitation tool for slack. It uses Slack's API to search through messages and [trufflehog's](https://github.com/trufflesecurity/trufflehog) secrets detectors to slurp up any juicy information. This is a work in progress and more is surely to come. Features, bug reports, and pull requests and very much welcome!
 
-## Usage
+## Authentication
+Since `slack-slurp` mainly uses Slack's API, authentication tokens are required to use the tool. If a normal user's credentials or session were stolen, two tokens are required. Only one token is required if a slack bot token was retrieved, though the tool might not fully work depending on the permissions of the token.
+
+### As a normal user
+The first required token for authenticating as a normal user is the value of the `d` cookie which starts with `xoxd-`. This cookie is set to HTTPOnly so the cookie must be retrieved manually. Log in to Slack using a web browser, then search for the `d` cookie using the browser's developer tools.
+
+![D Cookie](res/Slack-d-Cookie.png)
+
+The second required token is what I am calling the workspace API token which starts with `xoxc-`. To get this token, run the following JavaScript in the web browser's console window
+```
+var localConfig = JSON.parse(localStorage.localConfig_v2)
+localConfig.teams[localConfig.lastActiveTeamId].token
+```
+
+![Workspace API Token](res/Workspace-Token.png)
+
+### As a bot
+The only thing required to authenticate as a bot is the bot API token with starts with `xoxb-`. Depending on the scopes assigned to the bot, `slack-slurp` may not work.
+
+## CLI
+### Installation
+The `slack-slurp` CLI requires go1.19+ to install successfully. Run the following command to install the CLI:
+```
+go install github.com/NoF0rte/slack-slurp@latest
+```
+### Usage
 TODO: Add usage
-### Default Config
+```
+Slurp juicy slack related info
+
+Usage:
+  slack-slurp [flags]
+  slack-slurp [command]
+
+Available Commands:
+  channels    Returns channels accessible to the current user. This can include public/private channels and group/direct messages
+  completion  Generate the autocompletion script for the specified shell
+  config      Display config information
+  help        Help about any command
+  search      Search slack messages
+  test        Test
+
+Flags:
+      --config string   config file (default is $HOME/.slack-slurp.yaml)
+  -c, --cookie string   Slack d cookie. The token should start with xoxd. This is not needed if authenticated is a bot.
+  -h, --help            help for slack-slurp
+  -s, --slurp strings   What to slurp. [all,users,domains,secrets] (default [all])
+  -t, --token string    Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.
+
+Use "slack-slurp [command] --help" for more information about a command.
+```
+#### Default Config
 ```yaml
 detectors:
     - auth0managementapitoken
@@ -36,6 +85,98 @@ detectors:
     - uri
     - urlscan
 domains: []
-slack-cookie: ""
-slack-token: ""
+d-cookie: ""
+api-token: ""
 ```
+
+## Library
+### Installation
+Run the following command to install the module in your application:
+```
+go get github.com/NoF0rte/slack-slurp@latest
+```
+Then use the following to import it:
+```golang
+import "github.com/NoF0rte/slack-slurp/pkg/slurp"
+```
+### Slurp Client
+To create a slurp client (slurper), only the authentication tokens are required
+```golang
+cfg := slurp.Config{
+    APIToken:  "xoxc-xxxxxxx",
+    DCookie: "xoxd-xxxxxxx",
+}
+
+slurper = slurp.New(&cfg)
+```
+Optionally the default domains to slurp and secret detectors can be set via:
+```golang
+cfg := slurp.Config{
+    APIToken:  "xoxc-xxxxxxx",
+    DCookie: "xoxd-xxxxxxx",
+    Domains: []string{
+        "company.com",
+        ".local",
+    },
+    Detectors: []string{
+        "aws",
+        "generic",
+		"github",
+		"github_old",
+		"githubapp",
+		"gitlab",
+		"gitlabv2",
+		"heroku",
+		"jiratoken",
+		"microsoftteamswebhook",
+		"okta",
+    }
+}
+
+slurper = slurp.New(&cfg)
+```
+
+### Searching
+#### Messages
+To search Slack messages, the `SearchMessages(query)` and `SearchMessagesChan(query)` methods can be used. The `SearchMessages` method will only return all messages containing the query once all results have been retrieved.
+
+```golang
+messages, err := slurper.SearchMessages("my first query")
+if err != nil {
+    panic(err)
+}
+
+for _, message := range messages {
+    fmt.Println(message)
+}
+```
+The `SearchMessagesChan` method is the same as `SearchMessages` except it sends each message as it is found through the returned channel.
+```golang
+messageChan, errorChan := slurper.SearchMessagesChan("my first query")
+
+Loop:
+for {
+    select {
+    case message, ok := <-messageChan:
+        if !ok {
+            break Loop
+        }
+
+        fmt.Println(message)
+
+    case err = <-errorChan:
+        close(messageChan)
+    }
+}
+close(errorChan)
+```
+#### Files
+
+### Get Channels
+
+### Get Users
+
+### Slurp Secrets
+
+### Slurp Domains
+
