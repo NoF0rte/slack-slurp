@@ -121,15 +121,15 @@ cfg := slurp.Config{
     Detectors: []string{
         "aws",
         "generic",
-		"github",
-		"github_old",
-		"githubapp",
-		"gitlab",
-		"gitlabv2",
-		"heroku",
-		"jiratoken",
-		"microsoftteamswebhook",
-		"okta",
+        "github",
+        "github_old",
+        "githubapp",
+        "gitlab",
+        "gitlabv2",
+        "heroku",
+        "jiratoken",
+        "microsoftteamswebhook",
+        "okta",
     }
 }
 
