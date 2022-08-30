@@ -156,11 +156,11 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.slack-slurp.yaml)")
-	rootCmd.PersistentFlags().StringP("token", "t", "", "Slack Workspace token. The token should start with XOXC.")
-	rootCmd.PersistentFlags().StringP("cookie", "c", "", "Slack Workspace cookie. The token should start with XOXD.")
+	rootCmd.PersistentFlags().StringP("token", "t", "", "Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.")
+	rootCmd.PersistentFlags().StringP("cookie", "c", "", "Slack d cookie. The token should start with xoxd. This is not needed if authenticated is a bot.")
 
-	viper.BindPFlag("slack-token", rootCmd.PersistentFlags().Lookup("token"))
-	viper.BindPFlag("slack-cookie", rootCmd.PersistentFlags().Lookup("cookie"))
+	viper.BindPFlag("api-token", rootCmd.PersistentFlags().Lookup("token"))
+	viper.BindPFlag("d-cookie", rootCmd.PersistentFlags().Lookup("cookie"))
 
 	rootCmd.Flags().StringSliceP("slurp", "s", []string{"all"}, fmt.Sprintf("What to slurp. [%s]", strings.Join(allSlurps, ",")))
 	rootCmd.RegisterFlagCompletionFunc("slurp", cobra.FixedCompletions(allSlurps, cobra.ShellCompDirectiveDefault))
@@ -199,8 +199,8 @@ func initConfig() {
 	})
 
 	setConfigDefault("domains", []string{})
-	setConfigDefault("slack-token", "")
-	setConfigDefault("slack-cookie", "")
+	setConfigDefault("api-token", "")
+	setConfigDefault("d-cookie", "")
 
 	if cfgFile != "" {
 		// Use config file from the flag.

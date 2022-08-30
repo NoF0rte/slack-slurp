@@ -14,6 +14,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
+// ChannelType
 type ChannelType string
 
 const (
@@ -23,6 +24,7 @@ const (
 	ChannelGroupMessage  ChannelType = "mpim"
 )
 
+// Channel
 type Channel struct {
 	ID             string
 	Name           string
@@ -32,6 +34,7 @@ type Channel struct {
 	IsGroupMessage bool
 }
 
+// User
 type User struct {
 	FirstName string
 	LastName  string
@@ -43,18 +46,21 @@ type User struct {
 	Deleted   bool
 }
 
+// Secret
 type Secret struct {
 	// Raw contains the raw secret identifier data.
 	Raw      string
 	Verified bool
 }
 
+// SecretResult
 type SecretResult struct {
 	Type    string
 	Message string
 	Secrets []Secret
 }
 
+// ToJson
 func (s SecretResult) ToJson() (string, error) {
 	bytes, err := json.MarshalIndent(&s, "", "  ")
 	if err != nil {
@@ -64,19 +70,21 @@ func (s SecretResult) ToJson() (string, error) {
 	return string(bytes), nil
 }
 
+// Slurper
 type Slurper struct {
 	client    *slack.Client
 	config    *Config
 	detectors []detectors.Detector
 }
 
+// New returns a new Slurper instance
 func New(cfg *Config) Slurper {
 	jar, _ := cookiejar.New(nil)
 	url, _ := url.Parse("https://slack.com")
 	jar.SetCookies(url, []*http.Cookie{
 		{
 			Name:   "d",
-			Value:  cfg.SlackCookie,
+			Value:  cfg.DCookie,
 			Path:   "/",
 			Domain: "slack.com",
 		},
@@ -87,12 +95,23 @@ func New(cfg *Config) Slurper {
 	}
 
 	return Slurper{
-		client:    slack.New(cfg.SlackToken, slack.OptionHTTPClient(client)),
+		client:    slack.New(cfg.APIToken, slack.OptionHTTPClient(client)),
 		config:    cfg,
 		detectors: getDetectors(cfg.Detectors),
 	}
 }
 
+// AuthTest
+func (s Slurper) AuthTest() (string, error) {
+	resp, err := s.client.AuthTest()
+	if err != nil {
+		return "", err
+	}
+
+	return resp.User, nil
+}
+
+// SearchMessages
 func (s Slurper) SearchMessages(query string) ([]string, error) {
 	var err error
 	var messages []string
@@ -116,6 +135,7 @@ Loop:
 	return messages, err
 }
 
+// SearchMessagesChan
 func (s Slurper) SearchMessagesChan(query string) (chan string, chan error) {
 	params := slack.NewSearchParameters()
 	messageChan := make(chan string)
@@ -155,6 +175,7 @@ func (s Slurper) SearchMessagesChan(query string) (chan string, chan error) {
 	return messageChan, errorChan
 }
 
+// SearchFiles
 func (s Slurper) SearchFiles(query string) ([]string, error) {
 	params := slack.NewSearchParameters()
 	search, err := s.client.SearchFiles(query, params)
@@ -181,6 +202,7 @@ func (s Slurper) SearchFiles(query string) ([]string, error) {
 	return matches, nil
 }
 
+// GetUsers
 func (s Slurper) GetUsers() ([]User, error) {
 	slackUsers, err := s.client.GetUsers()
 	if err != nil {
@@ -203,11 +225,12 @@ func (s Slurper) GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func (s Slurper) GetSecrets() ([]SecretResult, error) {
+// GetSecrets
+func (s Slurper) GetSecrets(detectrs ...detectors.Detector) ([]SecretResult, error) {
 	var err error
 	var allSecrets []SecretResult
 
-	secretChan, errorChan := s.GetSecretsChan()
+	secretChan, errorChan := s.GetSecretsChan(detectrs...)
 
 Loop:
 	for {
@@ -226,12 +249,18 @@ Loop:
 	return allSecrets, err
 }
 
-func (s Slurper) GetSecretsChan() (chan SecretResult, chan error) {
+// GetSecretsChan
+func (s Slurper) GetSecretsChan(detectrs ...detectors.Detector) (chan SecretResult, chan error) {
 	secretChan := make(chan SecretResult)
 	errorChan := make(chan error)
 
+	selectedDetectors := s.detectors
+	if len(detectrs) != 0 {
+		selectedDetectors = detectrs
+	}
+
 	go func() {
-		for _, detector := range s.detectors {
+		for _, detector := range selectedDetectors {
 			var err error
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
@@ -287,8 +316,9 @@ func (s Slurper) GetSecretsChan() (chan SecretResult, chan error) {
 	return secretChan, errorChan
 }
 
-func (s Slurper) GetDomains() ([]string, error) {
-	domainChan, errorChan := s.GetDomainsChan()
+// GetDomains
+func (s Slurper) GetDomains(domains ...string) ([]string, error) {
+	domainChan, errorChan := s.GetDomainsChan(domains...)
 
 	var err error
 	var allDomains []string
@@ -310,13 +340,19 @@ Loop:
 	return allDomains, err
 }
 
-func (s Slurper) GetDomainsChan() (chan string, chan error) {
+// GetDomainsChan
+func (s Slurper) GetDomainsChan(domains ...string) (chan string, chan error) {
 	domainChan := make(chan string)
 	errorChan := make(chan error)
 
+	selectedDomains := s.config.Domains
+	if len(domains) != 0 {
+		selectedDomains = domains
+	}
+
 	go func() {
 		domainSet := treeset.NewWithStringComparator()
-		for _, domain := range s.config.Domains {
+		for _, domain := range selectedDomains {
 			var err error
 			regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
 			messageChan, err2Chan := s.SearchMessagesChan(domain)
@@ -356,6 +392,7 @@ func (s Slurper) GetDomainsChan() (chan string, chan error) {
 	return domainChan, errorChan
 }
 
+// GetChannels
 func (s Slurper) GetChannels(channelTypes ...ChannelType) ([]Channel, error) {
 	var allChannels []Channel
 	var types []string
