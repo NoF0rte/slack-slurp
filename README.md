@@ -20,6 +20,40 @@ localConfig.teams[localConfig.lastActiveTeamId].token
 ### As a bot
 The only thing required to authenticate as a bot is the bot API token with starts with `xoxb-`. Depending on the scopes assigned to the bot, `slack-slurp` may not work.
 
+## Trufflehog Detectors
+To have pretty robust secret slurping, I opted to use trufflehog's [detectors](https://github.com/trufflesecurity/trufflehog/tree/main/pkg/detectors). There are a myriad of secret detectors used within trufflehog. These are well tested, offer ways to verify the found secrets, and cover a very wide range of commonly used services. Currently only the following detectors are supported within `slack-slurp`:
+
+- auth0managementapitoken
+- aws
+- azure
+- censys
+- cloudflareapitoken
+- cloudflarecakey
+- digitaloceantoken
+- discordbottoken
+- discordwebhook
+- dropbox
+- gcp
+- generic
+- github
+- github_old
+- githubapp
+- gitlab
+- gitlabv2
+- heroku
+- jiratoken
+- microsoftteamswebhook
+- okta
+- pastebin
+- privatekey
+- shodankey
+- slack
+- slackwebhook
+- terraformcloudpersonaltoken
+- uri
+
+In the near future, custom detectors can be used. If there are other detectors that you wish to be supported, open a pull request or issue to let me know.
+
 ## CLI
 ### Installation
 The `slack-slurp` CLI requires go1.19+ to install successfully. Run the following command to install the CLI:
