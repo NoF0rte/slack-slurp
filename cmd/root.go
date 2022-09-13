@@ -201,6 +201,7 @@ func initConfig() {
 	setConfigDefault("domains", []string{})
 	setConfigDefault("api-token", "")
 	setConfigDefault("d-cookie", "")
+	setConfigDefault("ds-cookie", "")
 
 	if cfgFile != "" {
 		// Use config file from the flag.

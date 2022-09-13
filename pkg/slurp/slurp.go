@@ -90,6 +90,17 @@ func New(cfg *Config) Slurper {
 		},
 	})
 
+	if cfg.DSCookie != "" {
+		jar.SetCookies(url, []*http.Cookie{
+			{
+				Name:   "d-s",
+				Value:  cfg.DSCookie,
+				Path:   "/",
+				Domain: "slack.com",
+			},
+		})
+	}
+
 	client := &http.Client{
 		Jar: jar,
 	}
