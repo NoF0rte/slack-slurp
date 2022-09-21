@@ -172,7 +172,7 @@ slurper = slurp.New(&cfg)
 
 ### Searching
 #### Messages
-To search Slack messages, the `SearchMessages(query)` and `SearchMessagesChan(query)` methods can be used. The `SearchMessages` method will only return all messages containing the query once all results have been retrieved.
+To search Slack messages, the `SearchMessages(query)` and `SearchMessagesAsync(query)` methods can be used. The `SearchMessages` method will only return all messages containing the query once all results have been retrieved.
 
 ```golang
 messages, err := slurper.SearchMessages("my first query")
@@ -184,9 +184,9 @@ for _, message := range messages {
     fmt.Println(message)
 }
 ```
-The `SearchMessagesChan` method is the same as `SearchMessages` except it sends each message as it is found through the returned channel.
+The `SearchMessagesAsync` method is the same as `SearchMessages` except it sends each message as it is found through the returned channel.
 ```golang
-messageChan, errorChan := slurper.SearchMessagesChan("my first query")
+messageChan, errorChan := slurper.SearchMessagesAsync("my first query")
 
 Loop:
 for {

@@ -33,6 +33,9 @@ var rootCmd = &cobra.Command{
 		var cfg slurp.Config
 		viper.Unmarshal(&cfg)
 
+		threads, _ := cmd.Flags().GetInt("threads")
+		cfg.Threads = threads
+
 		slurper = slurp.New(&cfg)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -81,7 +84,7 @@ var rootCmd = &cobra.Command{
 				}
 				defer file.Close()
 
-				secretChan, errorChan := slurper.GetSecretsChan()
+				secretChan, errorChan := slurper.GetSecretsAsync()
 
 			SecretLoop:
 				for {
@@ -118,7 +121,7 @@ var rootCmd = &cobra.Command{
 				}
 				defer file.Close()
 
-				domainChan, errorChan := slurper.GetDomainsChan()
+				domainChan, errorChan := slurper.GetDomainsAsync()
 
 			DomainLoop:
 				for {
@@ -156,6 +159,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.slack-slurp.yaml)")
+	rootCmd.PersistentFlags().Int("threads", 10, "Number of threads to use")
 	rootCmd.PersistentFlags().StringP("token", "t", "", "Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.")
 	rootCmd.PersistentFlags().StringP("cookie", "c", "", "Slack d cookie. The token should start with xoxd. This is not needed if authenticated is a bot.")
 

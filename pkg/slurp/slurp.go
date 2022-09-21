@@ -8,6 +8,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+	"sync"
 
 	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/slack-go/slack"
@@ -127,7 +128,7 @@ func (s Slurper) SearchMessages(query string) ([]string, error) {
 	var err error
 	var messages []string
 
-	messageChan, errorChan := s.SearchMessagesChan(query)
+	messageChan, errorChan := s.SearchMessagesAsync(query)
 
 Loop:
 	for {
@@ -146,40 +147,79 @@ Loop:
 	return messages, err
 }
 
-// SearchMessagesChan
-func (s Slurper) SearchMessagesChan(query string) (chan string, chan error) {
+func (s Slurper) getPageCount(query string) (int, error) {
 	params := slack.NewSearchParameters()
+	search, err := s.client.SearchMessages(query, params)
+	if err != nil {
+		return 0, err
+	}
+
+	return search.Paging.Pages, nil
+}
+
+// SearchMessagesAsync
+func (s Slurper) SearchMessagesAsync(query string) (chan string, chan error) {
 	messageChan := make(chan string)
 	errorChan := make(chan error)
 
 	go func() {
-		search, err := s.client.SearchMessages(query, params)
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+
+		var current int
+		count, err := s.getPageCount(query)
 		if err != nil {
 			errorChan <- err
 			return
 		}
 
-		for {
-			for _, match := range search.Matches {
-				messageChan <- match.Text
-			}
+		action := func(startingPage int) {
+			defer wg.Done()
+			params := slack.NewSearchParameters()
+			params.Page = startingPage
 
-			params.Page++
-			if params.Page > search.Paging.Pages {
+			for {
+				search, err := s.client.SearchMessages(query, params)
+				if err != nil {
+					errorChan <- err
+					return
+				}
+
+				for _, match := range search.Matches {
+					messageChan <- match.Text
+				}
+
+				mu.Lock()
+				if current > count {
+					mu.Unlock()
+					break
+				}
+
+				current++
+				if current > count {
+					mu.Unlock()
+					break
+				}
+				params.Page = current
+
+				mu.Unlock()
+			}
+		}
+
+		for i := 1; i <= s.config.Threads; i++ {
+			// If thread count is greater than page count, go with page count
+			if current > count {
 				break
 			}
 
-			search, err = s.client.SearchMessages(query, params)
-			if err != nil && err.Error() == "internal_error" {
-				params.Page++
-				search, err = s.client.SearchMessages(query, params)
-			}
+			current = i
 
-			if err != nil {
-				errorChan <- err
-				return
-			}
+			wg.Add(1)
+			go action(current)
 		}
+
+		wg.Wait()
+
 		close(messageChan)
 	}()
 
@@ -241,7 +281,7 @@ func (s Slurper) GetSecrets(detectrs ...detectors.Detector) ([]SecretResult, err
 	var err error
 	var allSecrets []SecretResult
 
-	secretChan, errorChan := s.GetSecretsChan(detectrs...)
+	secretChan, errorChan := s.GetSecretsAsync(detectrs...)
 
 Loop:
 	for {
@@ -260,8 +300,8 @@ Loop:
 	return allSecrets, err
 }
 
-// GetSecretsChan
-func (s Slurper) GetSecretsChan(detectrs ...detectors.Detector) (chan SecretResult, chan error) {
+// GetSecretsAsync
+func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretResult, chan error) {
 	secretChan := make(chan SecretResult)
 	errorChan := make(chan error)
 
@@ -275,7 +315,7 @@ func (s Slurper) GetSecretsChan(detectrs ...detectors.Detector) (chan SecretResu
 			var err error
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
-				messageChan, err2Chan := s.SearchMessagesChan(fmt.Sprintf("%s*", keyword))
+				messageChan, err2Chan := s.SearchMessagesAsync(fmt.Sprintf("%s*", keyword))
 
 			Loop:
 				for {
@@ -329,7 +369,7 @@ func (s Slurper) GetSecretsChan(detectrs ...detectors.Detector) (chan SecretResu
 
 // GetDomains
 func (s Slurper) GetDomains(domains ...string) ([]string, error) {
-	domainChan, errorChan := s.GetDomainsChan(domains...)
+	domainChan, errorChan := s.GetDomainsAsync(domains...)
 
 	var err error
 	var allDomains []string
@@ -351,8 +391,8 @@ Loop:
 	return allDomains, err
 }
 
-// GetDomainsChan
-func (s Slurper) GetDomainsChan(domains ...string) (chan string, chan error) {
+// GetDomainsAsync
+func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 	domainChan := make(chan string)
 	errorChan := make(chan error)
 
@@ -366,7 +406,7 @@ func (s Slurper) GetDomainsChan(domains ...string) (chan string, chan error) {
 		for _, domain := range selectedDomains {
 			var err error
 			regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
-			messageChan, err2Chan := s.SearchMessagesChan(domain)
+			messageChan, err2Chan := s.SearchMessagesAsync(domain)
 
 		Loop:
 			for {

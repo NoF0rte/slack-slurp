@@ -7,4 +7,5 @@ type Config struct {
 	// Files       []string `mapstructure:"files"`
 	Domains   []string `mapstructure:"domains"`
 	Detectors []string `mapstructure:"detectors"`
+	Threads   int
 }

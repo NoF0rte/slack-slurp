@@ -16,7 +16,7 @@ var searchCmd = &cobra.Command{
 		var err error
 
 		query := strings.Join(args, " ")
-		messageChan, errorChan := slurper.SearchMessagesChan(query)
+		messageChan, errorChan := slurper.SearchMessagesAsync(query)
 
 	Loop:
 		for {
