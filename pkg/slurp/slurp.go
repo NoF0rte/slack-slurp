@@ -316,7 +316,7 @@ func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretRes
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
 				var searchString = keyword
-				var re = regexp.MustCompile(`-|_|.`)
+				var re = regexp.MustCompile(`(-|\.|_)$`)
 				if !re.MatchString(keyword) {
 					searchString = searchString + "*"
 				}
