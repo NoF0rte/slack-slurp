@@ -315,7 +315,12 @@ func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretRes
 			var err error
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
-				messageChan, err2Chan := s.SearchMessagesAsync(fmt.Sprintf("%s*", keyword))
+				var searchString = keyword
+				var re = regexp.MustCompile(`-|_|.`)
+				if !re.MatchString(keyword) {
+					searchString = searchString + "*"
+				}
+				messageChan, err2Chan := s.SearchMessagesAsync(fmt.Sprintf("%s", searchString))
 
 			Loop:
 				for {

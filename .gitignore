@@ -1,2 +1,5 @@
 .vscode/launch.json
 .slack-slurp.yaml
+*.txt
+*.json
+.gitattributes
