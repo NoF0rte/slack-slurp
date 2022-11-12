@@ -15,7 +15,7 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
-// ChannelType
+// ChannelType represents the different channels in Slack
 type ChannelType string
 
 const (
@@ -25,7 +25,6 @@ const (
 	ChannelGroupMessage  ChannelType = "mpim"
 )
 
-// Channel
 type Channel struct {
 	ID             string
 	Name           string
@@ -35,7 +34,6 @@ type Channel struct {
 	IsGroupMessage bool
 }
 
-// User
 type User struct {
 	FirstName string
 	LastName  string
@@ -47,21 +45,18 @@ type User struct {
 	Deleted   bool
 }
 
-// Secret
 type Secret struct {
 	// Raw contains the raw secret identifier data.
 	Raw      string
 	Verified bool
 }
 
-// SecretResult
 type SecretResult struct {
 	Type    string
 	Message string
 	Secrets []Secret
 }
 
-// ToJson
 func (s SecretResult) ToJson() (string, error) {
 	bytes, err := json.MarshalIndent(&s, "", "  ")
 	if err != nil {
@@ -71,7 +66,6 @@ func (s SecretResult) ToJson() (string, error) {
 	return string(bytes), nil
 }
 
-// Slurper
 type Slurper struct {
 	client    *slack.Client
 	config    *Config
@@ -109,11 +103,11 @@ func New(cfg *Config) Slurper {
 	return Slurper{
 		client:    slack.New(cfg.APIToken, slack.OptionHTTPClient(client)),
 		config:    cfg,
-		detectors: getDetectors(cfg.Detectors),
+		detectors: cfg.getDetectors(),
 	}
 }
 
-// AuthTest
+// AuthTest executes the auth.test API method which simply tests the current credentials
 func (s Slurper) AuthTest() (string, error) {
 	resp, err := s.client.AuthTest()
 	if err != nil {
@@ -123,7 +117,8 @@ func (s Slurper) AuthTest() (string, error) {
 	return resp.User, nil
 }
 
-// SearchMessages
+// SearchMessages will search Slack messages for the specified query. Will return only once all matched messages have been retrieved.
+// Slack's query syntax can be used here.
 func (s Slurper) SearchMessages(query string) ([]string, error) {
 	var err error
 	var messages []string
@@ -157,7 +152,8 @@ func (s Slurper) getPageCount(query string) (int, error) {
 	return search.Paging.Pages, nil
 }
 
-// SearchMessagesAsync
+// SearchMessagesAsync will search Slack messages for the specified query asynchronously using channels.
+// Slack's query syntax can be used here.
 func (s Slurper) SearchMessagesAsync(query string) (chan string, chan error) {
 	messageChan := make(chan string)
 	errorChan := make(chan error)
@@ -226,7 +222,8 @@ func (s Slurper) SearchMessagesAsync(query string) (chan string, chan error) {
 	return messageChan, errorChan
 }
 
-// SearchFiles
+// SearchFiles will search Slack files for the specified query. Will return only once all matched files have been retrieved.
+// Slack's query syntax can be used here.
 func (s Slurper) SearchFiles(query string) ([]string, error) {
 	params := slack.NewSearchParameters()
 	search, err := s.client.SearchFiles(query, params)
@@ -253,7 +250,7 @@ func (s Slurper) SearchFiles(query string) ([]string, error) {
 	return matches, nil
 }
 
-// GetUsers
+// GetUsers returns all users in the current workspace.
 func (s Slurper) GetUsers() ([]User, error) {
 	slackUsers, err := s.client.GetUsers()
 	if err != nil {
@@ -276,7 +273,7 @@ func (s Slurper) GetUsers() ([]User, error) {
 	return users, nil
 }
 
-// GetSecrets
+// GetSecrets searches Slack messages for secrets using trufflehog detectors. Will return only once all secrets have been retrieved.
 func (s Slurper) GetSecrets(detectrs ...detectors.Detector) ([]SecretResult, error) {
 	var err error
 	var allSecrets []SecretResult
@@ -300,7 +297,7 @@ Loop:
 	return allSecrets, err
 }
 
-// GetSecretsAsync
+// GetSecretsAsync searches Slack messages for secrets using trufflehog detectors asynchronously.
 func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretResult, chan error) {
 	secretChan := make(chan SecretResult)
 	errorChan := make(chan error)
@@ -379,7 +376,7 @@ func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretRes
 	return secretChan, errorChan
 }
 
-// GetDomains
+// GetDomains searches Slack for domains and subdomains. Will return only once all domains have been retrieved.
 func (s Slurper) GetDomains(domains ...string) ([]string, error) {
 	domainChan, errorChan := s.GetDomainsAsync(domains...)
 
@@ -403,7 +400,7 @@ Loop:
 	return allDomains, err
 }
 
-// GetDomainsAsync
+// GetDomainsAsync searches Slack for domains and subdomains asynchronously.
 func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 	domainChan := make(chan string)
 	errorChan := make(chan error)
@@ -455,7 +452,7 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 	return domainChan, errorChan
 }
 
-// GetChannels
+// GetChannels returns all channels in the current workspace of the specified type. If no channel type is supplied, the API defaults to returning public channels.
 func (s Slurper) GetChannels(channelTypes ...ChannelType) ([]Channel, error) {
 	var allChannels []Channel
 	var types []string
