@@ -58,6 +58,7 @@ type User struct {
 	LastName  string
 	FullName  string
 	Email     string
+	Username  string
 	Title     string
 	IsAdmin   bool
 	IsBot     bool
@@ -99,6 +100,38 @@ func (s SecretResult) ToJson() (string, error) {
 	}
 
 	return string(bytes), nil
+}
+
+type SearchOption func(query string) string
+
+func SearchBefore(date time.Time) SearchOption {
+	return func(query string) string {
+		return fmt.Sprintf("%s before:%s", query, date.Format("2006-01-02"))
+	}
+}
+
+func SearchAfter(date time.Time) SearchOption {
+	return func(query string) string {
+		return fmt.Sprintf("%s after:%s", query, date.Format("2006-01-02"))
+	}
+}
+
+func SearchInChannels(channels ...string) SearchOption {
+	return func(query string) string {
+		for _, channel := range channels {
+			query = fmt.Sprintf("%s in:#%s", query, channel)
+		}
+		return query
+	}
+}
+
+func SearchFromUsers(users ...string) SearchOption {
+	return func(query string) string {
+		for _, user := range users {
+			query = fmt.Sprintf("%s in:@%s", query, user)
+		}
+		return query
+	}
 }
 
 type Slurper struct {
@@ -154,11 +187,11 @@ func (s Slurper) AuthTest() (string, error) {
 
 // SearchMessages will search Slack messages for the specified query. Will return only once all matched messages have been retrieved.
 // Slack's query syntax can be used here.
-func (s Slurper) SearchMessages(query string) ([]Message, error) {
+func (s Slurper) SearchMessages(query string, options ...SearchOption) ([]Message, error) {
 	var err error
 	var messages []Message
 
-	messageChan, errorChan := s.SearchMessagesAsync(query)
+	messageChan, errorChan := s.SearchMessagesAsync(query, options...)
 
 Loop:
 	for {
@@ -189,9 +222,15 @@ func (s Slurper) getPageCount(query string) (int, error) {
 
 // SearchMessagesAsync will search Slack messages for the specified query asynchronously using channels.
 // Slack's query syntax can be used here.
-func (s Slurper) SearchMessagesAsync(query string) (chan Message, chan error) {
+func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (chan Message, chan error) {
 	messageChan := make(chan Message)
 	errorChan := make(chan error)
+
+	if len(options) != 0 {
+		for _, option := range options {
+			query = option(query)
+		}
+	}
 
 	go func() {
 		var wg sync.WaitGroup
@@ -308,6 +347,7 @@ func (s Slurper) GetUsers() ([]User, error) {
 			FullName:  user.Profile.RealName,
 			Title:     user.Profile.Title,
 			Email:     user.Profile.Email,
+			Username:  user.Name,
 			IsAdmin:   user.IsAdmin,
 			IsBot:     user.IsBot,
 			Deleted:   user.Deleted,
