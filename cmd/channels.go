@@ -80,6 +80,6 @@ var channelsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(channelsCmd)
 
-	channelsCmd.Flags().StringSliceP("types", "T", allChannelTypes, "The types of channels to get. Specify multiple by either specifying this argument again and/or supplying a comma separated list.")
+	channelsCmd.Flags().StringSliceP("types", "T", allChannelTypes, "The types of channels to get. A comma separated list and/or multiple -T flags are accepted.")
 	channelsCmd.Flags().StringP("output", "o", "slurp-channels.json", "File to write the output to. Specify '-' for stdout.")
 }

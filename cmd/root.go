@@ -42,10 +42,12 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.slack-slurp.yaml)")
 	rootCmd.PersistentFlags().Int("threads", 10, "Number of threads to use")
 	rootCmd.PersistentFlags().StringP("token", "t", "", "Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.")
-	rootCmd.PersistentFlags().StringP("cookie", "c", "", "Slack d cookie. The token should start with xoxd. This is not needed if authenticated is a bot.")
+	rootCmd.PersistentFlags().StringP("cookie", "c", "", "Slack d cookie. The token should start with xoxd. This is not needed if authenticated as a bot.")
+	rootCmd.PersistentFlags().String("ds-cookie", "", "Slack d-s cookie. This is not needed if authenticated as a bot.")
 
 	viper.BindPFlag("api-token", rootCmd.PersistentFlags().Lookup("token"))
 	viper.BindPFlag("d-cookie", rootCmd.PersistentFlags().Lookup("cookie"))
+	viper.BindPFlag("ds-cookie", rootCmd.PersistentFlags().Lookup("ds-cookie"))
 }
 
 func initConfig() {

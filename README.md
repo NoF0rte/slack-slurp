@@ -10,12 +10,19 @@ The first required token for authenticating as a normal user is the value of the
 ![D Cookie](res/Slack-d-Cookie.png)
 
 The second required token is what I am calling the workspace API token which starts with `xoxc-`. To get this token, run the following JavaScript in the web browser's console window
-```
+```js
 var localConfig = JSON.parse(localStorage.localConfig_v2)
 localConfig.teams[localConfig.lastActiveTeamId].token
 ```
 
 ![Workspace API Token](res/Workspace-Token.png)
+
+#### **Troubleshooting**
+If you run into authentication issues via `slack-slurp`, you might need to grab the `d-s` cookie value as shown here.
+
+![D-S Cookie](res/Slack-d-s-Cookie.png)
+
+This value seems to be a timestamp for the `d` cookie and sometimes is required. 
 
 ### As a bot
 The only thing required to authenticate as a bot is the bot API token with starts with `xoxb-`. Depending on the scopes assigned to the bot, `slack-slurp` may not work.
@@ -71,37 +78,8 @@ The `slack-slurp` CLI requires go1.19+ to install successfully. Run the followin
 ```
 go install github.com/NoF0rte/slack-slurp@latest
 ```
-### Usage
-TODO: Add usage
-```
-$ slack-slurp --help
 
-Slurp juicy slack related info
-
-Usage:
-  slack-slurp [command]
-
-Available Commands:
-  channels    Returns channels accessible to the current user. This can include public/private channels and group/direct messages
-  completion  Generate the autocompletion script for the specified shell
-  config      Display config information
-  domains     Slurp domains
-  help        Help about any command
-  search      Search slack messages
-  secrets     Slurp secrets
-  users       Slurp users
-  whoami      Test credentials
-
-Flags:
-      --config string   config file (default is $HOME/.slack-slurp.yaml)
-  -c, --cookie string   Slack d cookie. The token should start with xoxd. This is not needed if authenticated is a bot.
-  -h, --help            help for slack-slurp
-      --threads int     Number of threads to use (default 10)
-  -t, --token string    Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.
-
-Use "slack-slurp [command] --help" for more information about a command.
-```
-#### Default Config
+### Config
 The `.slack-slurp.yaml` config file contains the various configurable settings for `slack-slurp`
 ```yaml
 api-token: ""
@@ -139,10 +117,85 @@ detectors:
 custom-detectors: []
 domains: []
 ```
-Create a default config file by running the following:
+- **`api-token`**: Either the user or bot token. User tokens start with `xoxc-` and bot tokens start with `xoxb-`.
+- **`d-cookie`**: The value of the `d` cookie when logged into the Slack web interface. Not required when the `api-token` is a bot token.
+- **`ds-cookie`**: The value of the `d-s` cookie when logged into the Slack web interface. This seems to be a timestamp value for the `d` cookie and is only sometimes needed. Not required when the `api-token` is a bot token.
+- **`detectors`**: A list of trufflehog detectors to use when slurping secrets from Slack. Refer to [Trufflehog Detectors](#trufflehog-detectors) for which detectors `slack-slurp` supports.
+- **`custom-detectors`**: A list of custom detectors to use when slurping secrets from Slack. Refer to [Custom Detectors](#custom-detectors) for more information.
+- **`domains`**: A list of domains/subdomains used to slurp domains from Slack. For example, if `example.com` was in the list of domains, Slack would be searched for any messages that contained `example.com` and any subdomains.
+
+To create a default config file, run the following:
 ```
 slack-slurp config -s
 ```
+This creates the `.slack-slurp.yaml` config file with default values in the current directory.
+
+### Usage
+```
+$ slack-slurp --help
+
+Slurp juicy slack related info
+
+Usage:
+  slack-slurp [command]
+
+Available Commands:
+  channels    Returns channels accessible to the current user. This can include public/private channels and group/direct messages
+  completion  Generate the autocompletion script for the specified shell
+  config      Display config information
+  domains     Slurp domains
+  help        Help about any command
+  search      Search slack messages
+  secrets     Slurp secrets
+  users       Slurp users
+  whoami      Test credentials
+
+Flags:
+      --config string      config file (default is $HOME/.slack-slurp.yaml)
+  -c, --cookie string      Slack d cookie. The token should start with xoxd. This is not needed if authenticated as a bot.
+      --ds-cookie string   Slack d-s cookie. This is not needed if authenticated as a bot.
+  -h, --help               help for slack-slurp
+      --threads int        Number of threads to use (default 10)
+  -t, --token string       Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.
+
+Use "slack-slurp [command] --help" for more information about a command.
+```
+
+#### Whoami
+The `whoami` command will simply test the provided credentials (token, `d` cookie and `d-s` cookie). 
+
+If successful, the command will display the current user's name
+```
+$ slack-slurp whoami
+
+[+] Current user: example.user
+```
+
+If unsuccessful, `invalid_auth` is displayed
+
+#### Channels
+The `channels` command returns channels accessible to the current user. This can include public/private channels and group/direct messages. By default, it will return public/private channels and group/direct messages. The output is saved into a `slurp-channels.json` file but can be changed.
+
+To output to the console:
+```
+slack-slurp channels -o -
+```
+
+To get only private channels:
+```
+slack-slurp channels -T private
+```
+
+To get direct and group messages:
+```
+slack-slurp channels -T direct -T group
+```
+
+#### Domains
+
+#### Search
+#### Secrets
+#### Users
 
 ## Library
 ### Installation

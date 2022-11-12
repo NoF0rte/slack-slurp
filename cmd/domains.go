@@ -13,6 +13,7 @@ var domainsCmd = &cobra.Command{
 	Short: "Slurp domains",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Flags().GetString("output")
+		domains, _ := cmd.Flags().GetStringSlice("domains")
 
 		var err error
 		file := os.Stdout
@@ -26,7 +27,7 @@ var domainsCmd = &cobra.Command{
 
 		fmt.Println("[+] Slurping Domains...")
 
-		domainChan, errorChan := slurper.GetDomainsAsync()
+		domainChan, errorChan := slurper.GetDomainsAsync(domains...)
 
 	Loop:
 		for {
@@ -55,4 +56,5 @@ func init() {
 	rootCmd.AddCommand(domainsCmd)
 
 	domainsCmd.Flags().StringP("output", "o", "slurp-domains.txt", "File to write the output to. Specify '-' for stdout.")
+	domainsCmd.Flags().StringSliceP("domains", "d", []string{}, "The (sub)domains to slurp. Multiple -d flags are accepted. This will override the domains in the config file.")
 }
