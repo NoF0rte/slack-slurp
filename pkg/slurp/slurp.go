@@ -8,7 +8,10 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/slack-go/slack"
@@ -24,6 +27,22 @@ const (
 	ChannelDirectMessage ChannelType = "im"
 	ChannelGroupMessage  ChannelType = "mpim"
 )
+
+type Message struct {
+	User    string
+	Date    time.Time
+	Channel string
+	Text    string
+}
+
+func (m Message) ToJson() (string, error) {
+	bytes, err := json.MarshalIndent(&m, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
+}
 
 type Channel struct {
 	ID             string
@@ -53,7 +72,7 @@ type Secret struct {
 
 type SecretResult struct {
 	Type    string
-	Message string
+	Message Message
 	Secrets []Secret
 }
 
@@ -135,9 +154,9 @@ func (s Slurper) AuthTest() (string, error) {
 
 // SearchMessages will search Slack messages for the specified query. Will return only once all matched messages have been retrieved.
 // Slack's query syntax can be used here.
-func (s Slurper) SearchMessages(query string) ([]string, error) {
+func (s Slurper) SearchMessages(query string) ([]Message, error) {
 	var err error
-	var messages []string
+	var messages []Message
 
 	messageChan, errorChan := s.SearchMessagesAsync(query)
 
@@ -170,8 +189,8 @@ func (s Slurper) getPageCount(query string) (int, error) {
 
 // SearchMessagesAsync will search Slack messages for the specified query asynchronously using channels.
 // Slack's query syntax can be used here.
-func (s Slurper) SearchMessagesAsync(query string) (chan string, chan error) {
-	messageChan := make(chan string)
+func (s Slurper) SearchMessagesAsync(query string) (chan Message, chan error) {
+	messageChan := make(chan Message)
 	errorChan := make(chan error)
 
 	go func() {
@@ -198,7 +217,15 @@ func (s Slurper) SearchMessagesAsync(query string) (chan string, chan error) {
 				}
 
 				for _, match := range search.Matches {
-					messageChan <- match.Text
+					seconds, _ := strconv.ParseInt(strings.Split(match.Timestamp, ".")[0], 10, 64)
+					date := time.Unix(seconds, 0)
+
+					messageChan <- Message{
+						User:    match.Username,
+						Date:    date,
+						Channel: match.Channel.Name,
+						Text:    match.Text,
+					}
 				}
 
 				mu.Lock()
@@ -342,7 +369,7 @@ func (s Slurper) GetSecretsAsync(verify bool, detectrs ...detectors.Detector) (c
 							break Loop
 						}
 
-						results, err := detector.FromData(context.Background(), verify, []byte(message))
+						results, err := detector.FromData(context.Background(), verify, []byte(message.Text))
 						if err != nil {
 							errorChan <- err
 							return
@@ -440,7 +467,7 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 					if !ok {
 						break Loop
 					}
-					matches := regex.FindAllString(message, -1)
+					matches := regex.FindAllString(message.Text, -1)
 
 					for _, match := range matches {
 						if domainSet.Contains(match) {

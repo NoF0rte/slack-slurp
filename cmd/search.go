@@ -26,7 +26,11 @@ var searchCmd = &cobra.Command{
 					break Loop
 				}
 
-				fmt.Println(message)
+				fmt.Printf("[+] User: %s\n", message.User)
+				fmt.Printf("[+] Channel: %s\n", message.Channel)
+				fmt.Printf("[+] Date: %s\n", message.Date)
+				fmt.Println(message.Text)
+				fmt.Println()
 
 			case err = <-errorChan:
 				close(messageChan)
