@@ -201,6 +201,7 @@ func initConfig() {
 		"terraformcloudpersonaltoken",
 		"uri",
 	})
+	setConfigDefault("custom-detectors", []string{})
 
 	setConfigDefault("domains", []string{})
 	setConfigDefault("api-token", "")

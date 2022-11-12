@@ -347,9 +347,17 @@ func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretRes
 							})
 						}
 
+						typeString := ""
+						detectorType := results[0].DetectorType
+						if detectorType == detectorType_Custom {
+							typeString = detector.(*CustomDetector).Name
+						} else {
+							typeString = detectorType.String()
+						}
+
 						secretChan <- SecretResult{
 							Message: message,
-							Type:    results[0].DetectorType.String(),
+							Type:    typeString,
 							Secrets: secrets,
 						}
 					case err = <-err2Chan:
