@@ -1,5 +1,5 @@
 # Slack-Slurp
-What is slack-slurp? Slack-slurp is a pentesting social post-exploitation tool for slack. It uses Slack's API to search through messages and [trufflehog's](https://github.com/trufflesecurity/trufflehog) secrets detectors to slurp up any juicy information. This is a work in progress and more is surely to come. Features, bug reports, and pull requests and very much welcome!
+What is slack-slurp? Slack-slurp is a pentesting social post-exploitation tool for slack. It uses Slack's API to search through messages and [trufflehog's](https://github.com/trufflesecurity/trufflehog) secrets detectors to slurp up any juicy information. This is a work in progress and more is surely to come. Features, bug reports, and pull requests and very much welcome! I am a better coder than I am documenter so I apologize for the lack of documentation.
 
 ## Authentication
 Since `slack-slurp` mainly uses Slack's API, authentication tokens are required to use the tool. If a normal user's credentials or session were stolen, two tokens are required. Only one token is required if a slack bot token was retrieved, though the tool might not fully work depending on the permissions of the token.
@@ -52,7 +52,18 @@ To have pretty robust secret slurping, I opted to use trufflehog's [detectors](h
 - terraformcloudpersonaltoken
 - uri
 
-In the near future, custom detectors can be used. If there are other detectors that you wish to be supported, open a pull request or issue to let me know.
+### Custom Detectors
+Custom secret detectors can be added to the config file. The custom detectors just require a name, a keyword list, and regex patterns and look like the following:
+```yaml
+custom-detectors:
+  - name: "Custom Detector"
+    keywords:
+      - pass
+      - api
+    patterns:
+      - password\s*=\s*(.*)$
+      - api_key\s*=\s*(.*)$
+```
 
 ## CLI
 ### Installation
@@ -63,31 +74,39 @@ go install github.com/NoF0rte/slack-slurp@latest
 ### Usage
 TODO: Add usage
 ```
+$ slack-slurp --help
+
 Slurp juicy slack related info
 
 Usage:
-  slack-slurp [flags]
   slack-slurp [command]
 
 Available Commands:
   channels    Returns channels accessible to the current user. This can include public/private channels and group/direct messages
   completion  Generate the autocompletion script for the specified shell
   config      Display config information
+  domains     Slurp domains
   help        Help about any command
   search      Search slack messages
-  test        Test
+  secrets     Slurp secrets
+  users       Slurp users
+  whoami      Test credentials
 
 Flags:
       --config string   config file (default is $HOME/.slack-slurp.yaml)
   -c, --cookie string   Slack d cookie. The token should start with xoxd. This is not needed if authenticated is a bot.
   -h, --help            help for slack-slurp
-  -s, --slurp strings   What to slurp. [all,users,domains,secrets] (default [all])
+      --threads int     Number of threads to use (default 10)
   -t, --token string    Slack API token. The token should start with xoxc if authenticating as a normal user or xoxb if authenticating as a bot.
 
 Use "slack-slurp [command] --help" for more information about a command.
 ```
 #### Default Config
+The `.slack-slurp.yaml` config file contains the various configurable settings for `slack-slurp`
 ```yaml
+api-token: ""
+d-cookie: ""
+ds-cookie: ""
 detectors:
     - auth0managementapitoken
     - aws
@@ -117,10 +136,12 @@ detectors:
     - slackwebhook
     - terraformcloudpersonaltoken
     - uri
-    - urlscan
+custom-detectors: []
 domains: []
-d-cookie: ""
-api-token: ""
+```
+Create a default config file by running the following:
+```
+slack-slurp config -s
 ```
 
 ## Library
