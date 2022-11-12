@@ -5,22 +5,11 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strings"
 
-	"github.com/NoF0rte/slack-slurp/internal/util"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
-	"github.com/emirpasic/gods/sets/treeset"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-var allSlurps = []string{
-	"all",
-	"users",
-	// "links",
-	"domains",
-	"secrets",
-}
 
 var cfgFile string
 var slurper slurp.Slurper
@@ -37,114 +26,6 @@ var rootCmd = &cobra.Command{
 		cfg.Threads = threads
 
 		slurper = slurp.New(&cfg)
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		slurpSet := treeset.NewWithStringComparator()
-
-		slurps, _ := cmd.Flags().GetStringSlice("slurp")
-		for _, slurp := range slurps {
-			slurp = strings.ToLower(slurp)
-			if strings.Contains(slurp, "all") {
-				for _, s := range allSlurps {
-					if s == "all" {
-						continue
-					}
-
-					slurpSet.Add(s)
-				}
-
-				break
-			}
-
-			for _, s := range strings.Split(slurp, ",") {
-				slurpSet.Add(strings.TrimSpace(s))
-			}
-		}
-
-		for _, v := range slurpSet.Values() {
-			switch v.(string) {
-			case "users":
-				fmt.Println("[+] Slurping Users...")
-
-				users, err := slurper.GetUsers()
-				if err != nil {
-					return err
-				}
-
-				err = util.WriteJson("slurp-users.json", &users)
-				if err != nil {
-					return err
-				}
-			case "secrets":
-				fmt.Println("[+] Slurping Secrets...")
-
-				file, err := os.Create("slurp-secrets.json")
-				if err != nil {
-					return err
-				}
-				defer file.Close()
-
-				secretChan, errorChan := slurper.GetSecretsAsync()
-
-			SecretLoop:
-				for {
-					select {
-					case secret, ok := <-secretChan:
-						if !ok {
-							break SecretLoop
-						}
-
-						output, err := secret.ToJson()
-						if err != nil {
-							close(secretChan)
-							close(errorChan)
-							return err
-						}
-
-						fmt.Fprintln(file, output)
-					case err = <-errorChan:
-						close(secretChan)
-					}
-				}
-				close(errorChan)
-
-				if err != nil {
-					return err
-				}
-
-			case "domains":
-				fmt.Println("[+] Slurping Domains...")
-
-				file, err := os.Create("slurp-domains.txt")
-				if err != nil {
-					return err
-				}
-				defer file.Close()
-
-				domainChan, errorChan := slurper.GetDomainsAsync()
-
-			DomainLoop:
-				for {
-					select {
-					case domain, ok := <-domainChan:
-						if !ok {
-							break DomainLoop
-						}
-
-						fmt.Fprintln(file, domain)
-					case err = <-errorChan:
-						close(domainChan)
-					}
-				}
-				close(errorChan)
-
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		return nil
 	},
 }
 
@@ -165,9 +46,6 @@ func init() {
 
 	viper.BindPFlag("api-token", rootCmd.PersistentFlags().Lookup("token"))
 	viper.BindPFlag("d-cookie", rootCmd.PersistentFlags().Lookup("cookie"))
-
-	rootCmd.Flags().StringSliceP("slurp", "s", []string{"all"}, fmt.Sprintf("What to slurp. [%s]", strings.Join(allSlurps, ",")))
-	rootCmd.RegisterFlagCompletionFunc("slurp", cobra.FixedCompletions(allSlurps, cobra.ShellCompDirectiveDefault))
 }
 
 func initConfig() {
