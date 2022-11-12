@@ -311,16 +311,15 @@ func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretRes
 	}
 
 	go func() {
+		nonStarSearchableRe := regexp.MustCompile(`(-|\.|_)$`)
 		for _, detector := range selectedDetectors {
 			var err error
 			keywords := detector.Keywords()
 			for _, keyword := range keywords {
-				var searchString = keyword
-				var re = regexp.MustCompile(`(-|\.|_)$`)
-				if !re.MatchString(keyword) {
-					searchString = searchString + "*"
+				if !nonStarSearchableRe.MatchString(keyword) {
+					keyword = keyword + "*"
 				}
-				messageChan, err2Chan := s.SearchMessagesAsync(fmt.Sprintf("%s", searchString))
+				messageChan, err2Chan := s.SearchMessagesAsync(keyword)
 
 			Loop:
 				for {
