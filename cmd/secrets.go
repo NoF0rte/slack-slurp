@@ -16,6 +16,12 @@ var secretsCmd = &cobra.Command{
 	Short: "Slurp secrets",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Flags().GetString("output")
+		verify, _ := cmd.Flags().GetBool("verify")
+		verifiedOnly, _ := cmd.Flags().GetBool("verified")
+
+		if verifiedOnly {
+			verify = true
+		}
 
 		var err error
 		file := os.Stdout
@@ -29,7 +35,7 @@ var secretsCmd = &cobra.Command{
 
 		fmt.Println("[+] Slurping Secrets...")
 
-		secretChan, errorChan := slurper.GetSecretsAsync()
+		secretChan, errorChan := slurper.GetSecretsAsync(verify)
 
 	Loop:
 		for {
@@ -37,6 +43,13 @@ var secretsCmd = &cobra.Command{
 			case secret, ok := <-secretChan:
 				if !ok {
 					break Loop
+				}
+
+				if verifiedOnly {
+					secret = secret.Verified()
+					if len(secret.Secrets) == 0 { // No verified secrets
+						continue
+					}
 				}
 
 				output, err := secret.ToJson()
@@ -65,4 +78,6 @@ func init() {
 	rootCmd.AddCommand(secretsCmd)
 
 	secretsCmd.Flags().StringP("output", "o", "slurp-secrets.json", "File to write the output to. Specify '-' for stdout.")
+	secretsCmd.Flags().BoolP("verify", "V", false, "Enable verifying slurped secrets.")
+	secretsCmd.Flags().Bool("verified", false, "Only output verified secrets. Implies -V.")
 }

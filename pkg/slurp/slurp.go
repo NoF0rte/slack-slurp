@@ -57,6 +57,22 @@ type SecretResult struct {
 	Secrets []Secret
 }
 
+// Verified returns a new SecretResult containing only the verified secrets
+func (s SecretResult) Verified() SecretResult {
+	var verified []Secret
+	for _, secret := range s.Secrets {
+		if secret.Verified {
+			verified = append(verified, secret)
+		}
+	}
+
+	return SecretResult{
+		Type:    s.Type,
+		Message: s.Message,
+		Secrets: verified,
+	}
+}
+
 func (s SecretResult) ToJson() (string, error) {
 	bytes, err := json.MarshalIndent(&s, "", "  ")
 	if err != nil {
@@ -274,11 +290,11 @@ func (s Slurper) GetUsers() ([]User, error) {
 }
 
 // GetSecrets searches Slack messages for secrets using trufflehog detectors. Will return only once all secrets have been retrieved.
-func (s Slurper) GetSecrets(detectrs ...detectors.Detector) ([]SecretResult, error) {
+func (s Slurper) GetSecrets(verify bool, detectrs ...detectors.Detector) ([]SecretResult, error) {
 	var err error
 	var allSecrets []SecretResult
 
-	secretChan, errorChan := s.GetSecretsAsync(detectrs...)
+	secretChan, errorChan := s.GetSecretsAsync(verify, detectrs...)
 
 Loop:
 	for {
@@ -298,7 +314,7 @@ Loop:
 }
 
 // GetSecretsAsync searches Slack messages for secrets using trufflehog detectors asynchronously.
-func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretResult, chan error) {
+func (s Slurper) GetSecretsAsync(verify bool, detectrs ...detectors.Detector) (chan SecretResult, chan error) {
 	secretChan := make(chan SecretResult)
 	errorChan := make(chan error)
 
@@ -326,7 +342,7 @@ func (s Slurper) GetSecretsAsync(detectrs ...detectors.Detector) (chan SecretRes
 							break Loop
 						}
 
-						results, err := detector.FromData(context.Background(), false, []byte(message))
+						results, err := detector.FromData(context.Background(), verify, []byte(message))
 						if err != nil {
 							errorChan <- err
 							return
