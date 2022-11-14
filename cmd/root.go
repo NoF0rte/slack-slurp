@@ -13,6 +13,7 @@ import (
 
 var cfgFile string
 var slurper slurp.Slurper
+var searchOptions []slurp.SearchOption
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

@@ -33,6 +33,7 @@ type Message struct {
 	Date    time.Time
 	Channel string
 	Text    string
+	Raw     slack.SearchMessage `json:"-"`
 }
 
 func (m Message) ToJson() (string, error) {
@@ -42,6 +43,16 @@ func (m Message) ToJson() (string, error) {
 	}
 
 	return string(bytes), nil
+}
+
+type File struct {
+	Name     string
+	Created  time.Time
+	Channels []string
+	URL      string
+	Filetype string
+	User     string
+	Raw      slack.File
 }
 
 type Channel struct {
@@ -134,6 +145,15 @@ func SearchFromUsers(users ...string) SearchOption {
 	}
 }
 
+func SearchFileTypes(types ...string) SearchOption {
+	return func(query string) string {
+		for _, t := range types {
+			query = fmt.Sprintf("%s type:%s", query, t)
+		}
+		return query
+	}
+}
+
 type Slurper struct {
 	client    *slack.Client
 	config    *Config
@@ -210,14 +230,26 @@ Loop:
 	return messages, err
 }
 
-func (s Slurper) getPageCount(query string) (int, error) {
+func (s Slurper) getPageCount(query string, searchType string) (int, error) {
+	var paging slack.Paging
 	params := slack.NewSearchParameters()
-	search, err := s.client.SearchMessages(query, params)
-	if err != nil {
-		return 0, err
+	if searchType == "messages" {
+		search, err := s.client.SearchMessages(query, params)
+		if err != nil {
+			return 0, err
+		}
+
+		paging = search.Paging
+	} else if searchType == "files" {
+		search, err := s.client.SearchFiles(query, params)
+		if err != nil {
+			return 0, err
+		}
+
+		paging = search.Paging
 	}
 
-	return search.Paging.Pages, nil
+	return paging.Pages, nil
 }
 
 // SearchMessagesAsync will search Slack messages for the specified query asynchronously using channels.
@@ -237,7 +269,7 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 		var mu sync.Mutex
 
 		var current int
-		count, err := s.getPageCount(query)
+		count, err := s.getPageCount(query, "messages")
 		if err != nil {
 			errorChan <- err
 			return
@@ -264,6 +296,7 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 						Date:    date,
 						Channel: match.Channel.Name,
 						Text:    match.Text,
+						Raw:     match,
 					}
 				}
 
@@ -306,30 +339,139 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 
 // SearchFiles will search Slack files for the specified query. Will return only once all matched files have been retrieved.
 // Slack's query syntax can be used here.
-func (s Slurper) SearchFiles(query string) ([]string, error) {
-	params := slack.NewSearchParameters()
-	search, err := s.client.SearchFiles(query, params)
-	if err != nil {
-		return nil, err
-	}
+func (s Slurper) SearchFiles(query string, options ...SearchOption) ([]File, error) {
+	var err error
+	var files []File
 
-	var matches []string
+	fileChan, errorChan := s.SearchFilesAsync(query, options...)
+
+Loop:
 	for {
-		for _, match := range search.Matches {
-			matches = append(matches, match.URLPrivateDownload)
-		}
-
-		params.Page++
-		if params.Page > search.Paging.Pages {
-			break
-		}
-
-		search, err = s.client.SearchFiles(query, params)
-		if err != nil {
-			return nil, err
+		select {
+		case file, ok := <-fileChan:
+			if !ok {
+				break Loop
+			}
+			files = append(files, file)
+		case err = <-errorChan:
+			close(fileChan)
 		}
 	}
-	return matches, nil
+	close(errorChan)
+
+	return files, err
+}
+
+// SearchFilesAsync will search Slack files for the specified query asynchronously using channels.
+// Slack's query syntax can be used here.
+func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan File, chan error) {
+	fileChan := make(chan File)
+	errorChan := make(chan error)
+
+	if len(options) != 0 {
+		for _, option := range options {
+			query = option(query)
+		}
+	}
+
+	go func() {
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+
+		var current int
+		count, err := s.getPageCount(query, "files")
+		if err != nil {
+			errorChan <- err
+			return
+		}
+
+		action := func(startingPage int) {
+			defer wg.Done()
+			params := slack.NewSearchParameters()
+			params.Page = startingPage
+
+			for {
+				search, err := s.client.SearchFiles(query, params)
+				if err != nil {
+					errorChan <- err
+					return
+				}
+
+				for _, match := range search.Matches {
+					resolveID := func(channel string) string {
+						shareInfo, ok := match.Shares.Public[channel]
+						if ok && len(shareInfo) > 0 {
+							return shareInfo[0].ChannelName
+						}
+
+						shareInfo, ok = match.Shares.Private[channel]
+						if ok && len(shareInfo) > 0 {
+							return shareInfo[0].ChannelName
+						}
+
+						return channel
+					}
+
+					var channels []string
+					for _, channel := range match.Channels {
+						channels = append(channels, resolveID(channel))
+					}
+
+					for _, group := range match.Groups {
+						channels = append(channels, resolveID(group))
+					}
+
+					url := match.URLPrivateDownload
+					if url == "" {
+						url = match.URLPrivate
+					}
+
+					fileChan <- File{
+						Name:     match.Name,
+						Created:  match.Created.Time(),
+						Channels: channels,
+						URL:      url,
+						Filetype: match.Filetype,
+						User:     match.User,
+						Raw:      match,
+					}
+				}
+
+				mu.Lock()
+				if current > count {
+					mu.Unlock()
+					break
+				}
+
+				current++
+				if current > count {
+					mu.Unlock()
+					break
+				}
+				params.Page = current
+
+				mu.Unlock()
+			}
+		}
+
+		for i := 1; i <= s.config.Threads; i++ {
+			// If thread count is greater than page count, go with page count
+			if current > count {
+				break
+			}
+
+			current = i
+
+			wg.Add(1)
+			go action(current)
+		}
+
+		wg.Wait()
+
+		close(fileChan)
+	}()
+
+	return fileChan, errorChan
 }
 
 // GetUsers returns all users in the current workspace.

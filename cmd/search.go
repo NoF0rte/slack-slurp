@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -11,22 +11,26 @@ import (
 
 // searchCmd represents the search command
 var searchCmd = &cobra.Command{
-	Use:   "search query",
-	Short: "Search slack messages",
-	Args:  cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Use:   "search [query]",
+	Short: "Search slack messages and files",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Annotations["PersistentPreRunE"] == "skip" {
+			return nil
+		}
+
+		cmd.Root().PersistentPreRun(cmd, args) // We must call the rootCmd's PersistentPreRun manually since we define our own
+
 		channels, _ := cmd.Flags().GetStringSlice("channels")
 		users, _ := cmd.Flags().GetStringSlice("users")
 		before, _ := cmd.Flags().GetString("before")
 		after, _ := cmd.Flags().GetString("after")
 
-		var options []slurp.SearchOption
 		if len(channels) != 0 {
-			options = append(options, slurp.SearchInChannels(channels...))
+			searchOptions = append(searchOptions, slurp.SearchInChannels(channels...))
 		}
 
 		if len(users) != 0 {
-			options = append(options, slurp.SearchFromUsers(users...))
+			searchOptions = append(searchOptions, slurp.SearchFromUsers(users...))
 		}
 
 		if before != "" {
@@ -35,7 +39,7 @@ var searchCmd = &cobra.Command{
 				return err
 			}
 
-			options = append(options, slurp.SearchBefore(beforeTime))
+			searchOptions = append(searchOptions, slurp.SearchBefore(beforeTime))
 		}
 
 		if after != "" {
@@ -44,43 +48,40 @@ var searchCmd = &cobra.Command{
 				return err
 			}
 
-			options = append(options, slurp.SearchAfter(afterTime))
+			searchOptions = append(searchOptions, slurp.SearchAfter(afterTime))
 		}
 
-		var err error
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		// We don't disable arg parsing for this command so we can get the correct help displayed
+		// But because of that, we need to pass all args to the child commands manually
+		args := os.Args[2:]
+		for _, childCmd := range cmd.Commands() {
+			commandPathArgs := strings.Split(childCmd.CommandPath(), " ")[1:]
+			cmd.Root().SetArgs(append(commandPathArgs, args...))
 
-		query := strings.Join(args, " ")
-		messageChan, errorChan := slurper.SearchMessagesAsync(query, options...)
+			childCmd.Annotations = map[string]string{
+				"PersistentPreRunE": "skip",
+			}
+			childCmd.FParseErrWhitelist.UnknownFlags = true // Must do this so that flags passed to all child commands don't cause the command to error out
 
-	Loop:
-		for {
-			select {
-			case message, ok := <-messageChan:
-				if !ok {
-					break Loop
-				}
-
-				fmt.Printf("[+] User: %s\n", message.User)
-				fmt.Printf("[+] Channel: %s\n", message.Channel)
-				fmt.Printf("[+] Date: %s\n", message.Date)
-				fmt.Println(message.Text)
-				fmt.Println()
-
-			case err = <-errorChan:
-				close(messageChan)
+			err := childCmd.Execute()
+			if err != nil {
+				return err
 			}
 		}
-		close(errorChan)
-
-		return err
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
-	searchCmd.Flags().StringSliceP("channels", "C", []string{}, "Search messages within the channels.")
-	searchCmd.Flags().StringSliceP("users", "U", []string{}, "Search messages from users. Must be usernames.")
-	searchCmd.Flags().String("before", "", "Search messages before the date.")
-	searchCmd.Flags().String("after", "", "Search messages after the date.")
+	searchCmd.PersistentFlags().StringSliceP("channels", "C", []string{}, "Search within the channels.")
+	searchCmd.PersistentFlags().StringSliceP("users", "U", []string{}, "Search from users. Must be usernames.")
+	searchCmd.PersistentFlags().String("before", "", "Search before the date.")
+	searchCmd.PersistentFlags().String("after", "", "Search after the date.")
+
+	searchCmd.Flags().StringSliceP("file-types", "f", []string{}, "Search specific file types")
 }
