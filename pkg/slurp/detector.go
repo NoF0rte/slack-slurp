@@ -51,3 +51,7 @@ func (d *CustomDetector) FromData(ctx context.Context, verify bool, data []byte)
 
 	return results, nil
 }
+
+func (d *CustomDetector) Type() detectorspb.DetectorType {
+	return detectorType_Custom
+}
