@@ -154,6 +154,32 @@ func SearchFileTypes(types ...string) SearchOption {
 	}
 }
 
+type SecretOptions struct {
+	searchOptions []SearchOption
+	detectors     []detectors.Detector
+	verify        bool
+}
+
+type SecretOption func(opts *SecretOptions)
+
+func SecretsInChannel(channels ...string) SecretOption {
+	return func(opts *SecretOptions) {
+		opts.searchOptions = append(opts.searchOptions, SearchInChannels(channels...))
+	}
+}
+
+func SecretsDetectors(detectrs ...detectors.Detector) SecretOption {
+	return func(opts *SecretOptions) {
+		opts.detectors = detectrs
+	}
+}
+
+func SecretsVerify(verify bool) SecretOption {
+	return func(opts *SecretOptions) {
+		opts.verify = verify
+	}
+}
+
 type Slurper struct {
 	client    *slack.Client
 	config    *Config
@@ -191,7 +217,7 @@ func New(cfg *Config) Slurper {
 	return Slurper{
 		client:    slack.New(cfg.APIToken, slack.OptionHTTPClient(client)),
 		config:    cfg,
-		detectors: cfg.getDetectors(),
+		detectors: cfg.GetDetectors(),
 	}
 }
 
@@ -499,11 +525,12 @@ func (s Slurper) GetUsers() ([]User, error) {
 }
 
 // GetSecrets searches Slack messages for secrets using trufflehog detectors. Will return only once all secrets have been retrieved.
-func (s Slurper) GetSecrets(verify bool, detectrs ...detectors.Detector) ([]SecretResult, error) {
+func (s Slurper) GetSecrets(opts ...SecretOption) ([]SecretResult, error) {
+
 	var err error
 	var allSecrets []SecretResult
 
-	secretChan, errorChan := s.GetSecretsAsync(verify, detectrs...)
+	secretChan, errorChan := s.GetSecretsAsync(opts...)
 
 Loop:
 	for {
@@ -523,13 +550,18 @@ Loop:
 }
 
 // GetSecretsAsync searches Slack messages for secrets using trufflehog detectors asynchronously.
-func (s Slurper) GetSecretsAsync(verify bool, detectrs ...detectors.Detector) (chan SecretResult, chan error) {
+func (s Slurper) GetSecretsAsync(opts ...SecretOption) (chan SecretResult, chan error) {
 	secretChan := make(chan SecretResult)
 	errorChan := make(chan error)
 
+	options := &SecretOptions{}
+	for _, o := range opts {
+		o(options)
+	}
+
 	selectedDetectors := s.detectors
-	if len(detectrs) != 0 {
-		selectedDetectors = detectrs
+	if len(options.detectors) != 0 {
+		selectedDetectors = options.detectors
 	}
 
 	go func() {
@@ -541,7 +573,7 @@ func (s Slurper) GetSecretsAsync(verify bool, detectrs ...detectors.Detector) (c
 				if !nonStarSearchableRe.MatchString(keyword) {
 					keyword = keyword + "*"
 				}
-				messageChan, err2Chan := s.SearchMessagesAsync(keyword)
+				messageChan, err2Chan := s.SearchMessagesAsync(keyword, options.searchOptions...)
 
 			Loop:
 				for {
@@ -551,7 +583,7 @@ func (s Slurper) GetSecretsAsync(verify bool, detectrs ...detectors.Detector) (c
 							break Loop
 						}
 
-						results, err := detector.FromData(context.Background(), verify, []byte(message.Text))
+						results, err := detector.FromData(context.Background(), options.verify, []byte(message.Text))
 						if err != nil {
 							errorChan <- err
 							return
