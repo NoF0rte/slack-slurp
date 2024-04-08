@@ -12,6 +12,7 @@ import (
 )
 
 var cfgFile string
+var config slurp.Config
 var slurper slurp.Slurper
 var searchOptions []slurp.SearchOption
 
@@ -20,13 +21,12 @@ var rootCmd = &cobra.Command{
 	Use:   "slack-slurp",
 	Short: "Slurp juicy slack related info",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		var cfg slurp.Config
-		viper.Unmarshal(&cfg)
+		viper.Unmarshal(&config)
 
 		threads, _ := cmd.Flags().GetInt("threads")
-		cfg.Threads = threads
+		config.Threads = threads
 
-		slurper = slurp.New(&cfg)
+		slurper = slurp.New(&config)
 	},
 }
 

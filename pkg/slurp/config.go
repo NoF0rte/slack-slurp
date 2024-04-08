@@ -1,6 +1,8 @@
 package slurp
 
 import (
+	"strings"
+
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
@@ -52,9 +54,15 @@ type Config struct {
 	CustomDetectors []CustomDetector `mapstructure:"custom-detectors"`
 }
 
-func (c Config) getDetectors() []detectors.Detector {
+func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {
+	defaultDetectors := true
+	if len(detectrs) == 0 {
+		detectrs = c.Detectors
+		defaultDetectors = false
+	}
+
 	var selectedDetectors []detectors.Detector
-	for _, t := range c.Detectors {
+	for _, t := range detectrs {
 		var detector detectors.Detector
 		switch t {
 		case "mongodb":
@@ -131,6 +139,15 @@ func (c Config) getDetectors() []detectors.Detector {
 			detector = terraformcloudpersonaltoken.Scanner{}
 		case "uri":
 			detector = uri.Scanner{}
+		default:
+			if !defaultDetectors && len(c.CustomDetectors) != 0 {
+				for _, d := range c.CustomDetectors {
+					if strings.EqualFold(d.Name, t) {
+						selectedDetectors = append(selectedDetectors, &d)
+						break
+					}
+				}
+			}
 		}
 
 		if detector != nil {
@@ -138,7 +155,7 @@ func (c Config) getDetectors() []detectors.Detector {
 		}
 	}
 
-	if len(c.CustomDetectors) != 0 {
+	if defaultDetectors && len(c.CustomDetectors) != 0 {
 		for _, d := range c.CustomDetectors {
 			selectedDetectors = append(selectedDetectors, &d)
 		}
