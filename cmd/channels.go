@@ -25,14 +25,12 @@ var channelsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Flags().GetString("output")
 
-		file := os.Stdout
-		if output != "-" {
-			var err error
-			file, err = os.Create(output)
-			if err != nil {
-				return err
-			}
+		file, err := os.Create(output)
+		if err != nil {
+			return err
 		}
+
+		defer file.Close()
 
 		typeSet := treeset.NewWithStringComparator()
 
@@ -61,17 +59,44 @@ var channelsCmd = &cobra.Command{
 			}
 		}
 
-		channels, err := slurper.GetChannels(channelTypes...)
-		if err != nil {
-			return err
+		fmt.Println("[+] Slurping Channels...")
+
+		channelChan, errorChan := slurper.GetChannelsAsync(channelTypes...)
+
+		var channelErr error
+		var channels []slurp.Channel
+
+	Loop:
+		for {
+			select {
+			case channel, ok := <-channelChan:
+				if !ok {
+					break Loop
+				}
+				channels = append(channels, channel)
+
+				bytes, _ := json.MarshalIndent(channel, "", "  ")
+				fmt.Println(string(bytes))
+			case channelErr = <-errorChan:
+				close(channelChan)
+			}
+		}
+		close(errorChan)
+
+		if len(channels) > 0 {
+			fmt.Printf("[+] Writing to %s\n", output)
+
+			bytes, err := json.MarshalIndent(channels, "", "  ")
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintln(file, string(bytes))
 		}
 
-		bytes, err := json.MarshalIndent(channels, "", "  ")
-		if err != nil {
-			return err
+		if channelErr != nil {
+			return channelErr
 		}
-
-		fmt.Fprintln(file, string(bytes))
 
 		return nil
 	},
@@ -81,5 +106,5 @@ func init() {
 	rootCmd.AddCommand(channelsCmd)
 
 	channelsCmd.Flags().StringSliceP("types", "T", allChannelTypes, "The types of channels to get. A comma separated list and/or multiple -T flags are accepted.")
-	channelsCmd.Flags().StringP("output", "o", "slurp-channels.json", "File to write the output to. Specify '-' for stdout.")
+	channelsCmd.Flags().StringP("output", "o", "slurp-channels.json", "File to write the output to.")
 }
