@@ -233,13 +233,13 @@ func New(cfg *Config) Slurper {
 }
 
 // AuthTest executes the auth.test API method which simply tests the current credentials
-func (s Slurper) AuthTest() (string, error) {
+func (s Slurper) AuthTest() (*slack.AuthTestResponse, error) {
 	resp, err := s.client.AuthTest()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return resp.User, nil
+	return resp, nil
 }
 
 // SearchMessages will search Slack messages for the specified query. Will return only once all matched messages have been retrieved.

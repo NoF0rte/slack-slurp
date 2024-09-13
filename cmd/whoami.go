@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -11,13 +12,14 @@ var whoamiCmd = &cobra.Command{
 	Use:   "whoami",
 	Short: "Test credentials",
 	Run: func(cmd *cobra.Command, args []string) {
-		user, err := slurper.AuthTest()
+		authTest, err := slurper.AuthTest()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Printf("[+] Current user: %s\n", user)
+		bytes, _ := json.MarshalIndent(authTest, "", "  ")
+		fmt.Println(string(bytes))
 	},
 }
 
