@@ -260,18 +260,32 @@ Loop:
 	return messages, err
 }
 
+func (s Slurper) handleRateLimit(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if rateLimitErr, ok := err.(*slack.RateLimitedError); ok {
+		time.Sleep(rateLimitErr.RetryAfter)
+		return true
+	}
+
+	return false
+}
+
 func (s Slurper) getPageCount(query string, searchType string) (int, error) {
 	var paging slack.Paging
 	params := slack.NewSearchParameters()
+
 	if searchType == "messages" {
-		search, err := s.client.SearchMessages(query, params)
+		search, err := s.searchMessages(query, params)
 		if err != nil {
 			return 0, err
 		}
 
 		paging = search.Paging
 	} else if searchType == "files" {
-		search, err := s.client.SearchFiles(query, params)
+		search, err := s.searchFiles(query, params)
 		if err != nil {
 			return 0, err
 		}
@@ -280,6 +294,17 @@ func (s Slurper) getPageCount(query string, searchType string) (int, error) {
 	}
 
 	return paging.Pages, nil
+}
+
+func (s Slurper) searchMessages(query string, params slack.SearchParameters) (*slack.SearchMessages, error) {
+	for {
+		search, err := s.client.SearchMessages(query, params)
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return search, err
+	}
 }
 
 // SearchMessagesAsync will search Slack messages for the specified query asynchronously using channels.
@@ -311,7 +336,7 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 			params.Page = startingPage
 
 			for {
-				search, err := s.client.SearchMessages(query, params)
+				search, err := s.searchMessages(query, params)
 				if err != nil {
 					errorChan <- err
 					return
@@ -365,6 +390,17 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 	}()
 
 	return messageChan, errorChan
+}
+
+func (s Slurper) searchFiles(query string, params slack.SearchParameters) (*slack.SearchFiles, error) {
+	for {
+		search, err := s.client.SearchFiles(query, params)
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return search, err
+	}
 }
 
 // SearchFiles will search Slack files for the specified query. Will return only once all matched files have been retrieved.
@@ -421,7 +457,7 @@ func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan F
 			params.Page = startingPage
 
 			for {
-				search, err := s.client.SearchFiles(query, params)
+				search, err := s.searchFiles(query, params)
 				if err != nil {
 					errorChan <- err
 					return
@@ -504,9 +540,20 @@ func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan F
 	return fileChan, errorChan
 }
 
+func (s Slurper) getUsers() ([]slack.User, error) {
+	for {
+		slackUsers, err := s.client.GetUsers()
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return slackUsers, err
+	}
+}
+
 // GetUsers returns all users in the current workspace.
 func (s Slurper) GetUsers() ([]User, error) {
-	slackUsers, err := s.client.GetUsers()
+	slackUsers, err := s.getUsers()
 	if err != nil {
 		return nil, err
 	}
