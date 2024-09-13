@@ -92,7 +92,7 @@ var secretsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(secretsCmd)
 
-	secretsCmd.Flags().StringP("output", "o", "slurp-secrets.json", "File to write the output to. Specify '-' for stdout.")
+	secretsCmd.Flags().StringP("output", "o", "slurp-secrets.json", "File to write the output to.")
 	secretsCmd.Flags().BoolP("verify", "V", false, "Enable verifying slurped secrets.")
 	secretsCmd.Flags().Bool("verified", false, "Only output verified secrets. Implies -V.")
 	secretsCmd.Flags().StringSliceP("detectors", "d", []string{}, "The Trufflehog detectors to use. Multiple -d flags are accepted. This will override the detectors in the config file.")
