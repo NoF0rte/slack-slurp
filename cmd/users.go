@@ -48,5 +48,5 @@ var usersCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(usersCmd)
 
-	usersCmd.Flags().StringP("output", "o", "slurp-users.json", "File to write the output to. Specify '-' for stdout.")
+	usersCmd.Flags().StringP("output", "o", "slurp-users.json", "File to write the output to.")
 }

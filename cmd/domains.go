@@ -57,6 +57,6 @@ var domainsCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(domainsCmd)
 
-	domainsCmd.Flags().StringP("output", "o", "slurp-domains.txt", "File to write the output to. Specify '-' for stdout.")
+	domainsCmd.Flags().StringP("output", "o", "slurp-domains.txt", "File to write the output to.")
 	domainsCmd.Flags().StringSliceP("domains", "d", []string{}, "The (sub)domains to slurp. Multiple -d flags are accepted. This will override the domains in the config file.")
 }
