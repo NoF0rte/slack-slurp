@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
@@ -23,15 +24,14 @@ var secretsCmd = &cobra.Command{
 			verify = true
 		}
 
-		var err error
-		file := os.Stdout
-		if output != "-" {
-			file, err = os.Create(output)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
+		file, err := os.Create(output)
+		if err != nil {
+			return err
 		}
+
+		defer file.Close()
+
+		writer := io.MultiWriter(file, os.Stdout)
 
 		fmt.Println("[+] Slurping Secrets...")
 
@@ -72,7 +72,7 @@ var secretsCmd = &cobra.Command{
 					return err
 				}
 
-				fmt.Fprintln(file, output)
+				fmt.Fprintln(writer, output)
 			case err = <-errorChan:
 				close(secretChan)
 			}
@@ -82,6 +82,8 @@ var secretsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		fmt.Printf("[+] Output written to %s\n", output)
 
 		return nil
 	},

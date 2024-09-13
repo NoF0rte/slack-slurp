@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -15,15 +16,14 @@ var domainsCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		domains, _ := cmd.Flags().GetStringSlice("domains")
 
-		var err error
-		file := os.Stdout
-		if output != "-" {
-			file, err = os.Create(output)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
+		file, err := os.Create(output)
+		if err != nil {
+			return err
 		}
+
+		defer file.Close()
+
+		writer := io.MultiWriter(file, os.Stdout)
 
 		fmt.Println("[+] Slurping Domains...")
 
@@ -37,7 +37,7 @@ var domainsCmd = &cobra.Command{
 					break Loop
 				}
 
-				fmt.Fprintln(file, domain)
+				fmt.Fprintln(writer, domain)
 			case err = <-errorChan:
 				close(domainChan)
 			}
@@ -47,6 +47,8 @@ var domainsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		fmt.Printf("[+] Output written to %s\n", output)
 
 		return nil
 	},

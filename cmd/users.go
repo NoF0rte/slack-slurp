@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -15,15 +16,14 @@ var usersCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Flags().GetString("output")
 
-		file := os.Stdout
-		if output != "-" {
-			var err error
-			file, err = os.Create(output)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
+		file, err := os.Create(output)
+		if err != nil {
+			return err
 		}
+
+		defer file.Close()
+
+		writer := io.MultiWriter(file, os.Stdout)
 
 		fmt.Println("[+] Slurping Users...")
 
@@ -37,7 +37,9 @@ var usersCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Fprintln(file, string(bytes))
+		fmt.Fprintln(writer, string(bytes))
+
+		fmt.Printf("[+] Output written to %s\n", output)
 
 		return nil
 	},
