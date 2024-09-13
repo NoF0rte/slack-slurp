@@ -9,7 +9,7 @@ import (
 
 // messagesCmd represents the messages command
 var messagesCmd = &cobra.Command{
-	Use:   "messages",
+	Use:   "messages [query]",
 	Short: "Search Slack messages",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error

@@ -17,7 +17,7 @@ import (
 // configCmd represents the config command
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Display config information",
+	Short: "Display config information for this tool",
 	Args:  cobra.RangeArgs(0, 3),
 	Run: func(cmd *cobra.Command, args []string) {
 		count := len(args)

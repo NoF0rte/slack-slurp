@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -22,15 +23,15 @@ var allChannelTypes = []string{
 var channelsCmd = &cobra.Command{
 	Use:   "channels",
 	Short: "Returns channels accessible to the current user. This can include public/private channels and group/direct messages",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		output, _ := cmd.Flags().GetString("output")
 
 		file, err := os.Create(output)
-		if err != nil {
-			return err
-		}
+		cobra.CheckErr(err)
 
 		defer file.Close()
+
+		writer := io.MultiWriter(file, os.Stdout)
 
 		typeSet := treeset.NewWithStringComparator()
 
@@ -55,7 +56,7 @@ var channelsCmd = &cobra.Command{
 			case "public":
 				channelTypes = append(channelTypes, slurp.ChannelPublic)
 			default:
-				return fmt.Errorf("%s is not a valid channel type", t)
+				cobra.CheckErr(fmt.Errorf("%s is not a valid channel type", t))
 			}
 		}
 
@@ -64,7 +65,6 @@ var channelsCmd = &cobra.Command{
 		channelChan, errorChan := slurper.GetChannelsAsync(channelTypes...)
 
 		var channelErr error
-		var channels []slurp.Channel
 
 	Loop:
 		for {
@@ -73,32 +73,18 @@ var channelsCmd = &cobra.Command{
 				if !ok {
 					break Loop
 				}
-				channels = append(channels, channel)
 
 				bytes, _ := json.MarshalIndent(channel, "", "  ")
-				fmt.Println(string(bytes))
+				fmt.Fprintln(writer, string(bytes))
 			case channelErr = <-errorChan:
 				close(channelChan)
 			}
 		}
 		close(errorChan)
 
-		if len(channels) > 0 {
-			fmt.Printf("[+] Writing to %s\n", output)
+		fmt.Printf("[+] Output written to %s\n", output)
 
-			bytes, err := json.MarshalIndent(channels, "", "  ")
-			if err != nil {
-				return err
-			}
-
-			fmt.Fprintln(file, string(bytes))
-		}
-
-		if channelErr != nil {
-			return channelErr
-		}
-
-		return nil
+		cobra.CheckErr(channelErr)
 	},
 }
 
