@@ -56,12 +56,19 @@ type File struct {
 }
 
 type Channel struct {
-	ID             string
-	Name           string
-	IsPrivate      bool
-	IsGroup        bool
-	IsDM           bool
-	IsGroupMessage bool
+	ID               string
+	Name             string
+	Topic            string
+	IsChannel        bool
+	IsArchived       bool
+	IsPrivate        bool
+	IsGroup          bool
+	IsDM             bool
+	IsGroupMessage   bool
+	NumMembers       int
+	ConnectedTeamIDs []string
+	SharedTeamIDs    []string
+	InternalTeamIDs  []string
 }
 
 type User struct {
@@ -818,6 +825,7 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 	go func() {
 		params := &slack.GetConversationsParameters{
 			Types: types,
+			Limit: 999, // Get as much as we can in one request to avoid rate limiting as much as we can
 		}
 
 		for {
@@ -829,12 +837,19 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 
 			for _, channel := range channels {
 				channelChan <- Channel{
-					ID:             channel.ID,
-					Name:           channel.Name,
-					IsPrivate:      channel.IsPrivate,
-					IsGroup:        channel.IsGroup,
-					IsDM:           channel.IsIM,
-					IsGroupMessage: channel.IsMpIM,
+					ID:               channel.ID,
+					Name:             channel.Name,
+					Topic:            channel.Topic.Value,
+					IsChannel:        channel.IsChannel,
+					IsArchived:       channel.IsArchived,
+					IsPrivate:        channel.IsPrivate,
+					IsGroup:          channel.IsGroup,
+					IsDM:             channel.IsIM,
+					IsGroupMessage:   channel.IsMpIM,
+					NumMembers:       channel.NumMembers,
+					ConnectedTeamIDs: channel.ConnectedTeamIDs,
+					SharedTeamIDs:    channel.SharedTeamIDs,
+					InternalTeamIDs:  channel.InternalTeamIDs,
 				}
 			}
 
