@@ -65,15 +65,19 @@ type Channel struct {
 }
 
 type User struct {
-	FirstName string
-	LastName  string
-	FullName  string
-	Email     string
-	Username  string
-	Title     string
-	IsAdmin   bool
-	IsBot     bool
-	Deleted   bool
+	FirstName     string
+	LastName      string
+	FullName      string
+	Email         string
+	Username      string
+	Phone         string
+	Title         string
+	IsAdmin       bool
+	IsBot         bool
+	IsOwner       bool
+	Has2FA        bool
+	TwoFactorType string
+	Deleted       bool
 }
 
 type Secret struct {
@@ -509,16 +513,25 @@ func (s Slurper) GetUsers() ([]User, error) {
 
 	var users []User
 	for _, user := range slackUsers {
+		twoFactor := ""
+		if user.TwoFactorType != nil {
+			twoFactor = *user.TwoFactorType
+		}
+
 		users = append(users, User{
-			FirstName: user.Profile.FirstName,
-			LastName:  user.Profile.LastName,
-			FullName:  user.Profile.RealName,
-			Title:     user.Profile.Title,
-			Email:     user.Profile.Email,
-			Username:  user.Name,
-			IsAdmin:   user.IsAdmin,
-			IsBot:     user.IsBot,
-			Deleted:   user.Deleted,
+			FirstName:     user.Profile.FirstName,
+			LastName:      user.Profile.LastName,
+			FullName:      user.Profile.RealName,
+			Title:         user.Profile.Title,
+			Email:         user.Profile.Email,
+			Phone:         user.Profile.Phone,
+			Username:      user.Name,
+			IsAdmin:       user.IsAdmin,
+			IsBot:         user.IsBot,
+			IsOwner:       user.IsOwner,
+			Has2FA:        user.Has2FA,
+			TwoFactorType: twoFactor,
+			Deleted:       user.Deleted,
 		})
 	}
 	return users, nil
