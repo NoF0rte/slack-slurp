@@ -769,44 +769,84 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 	return domainChan, errorChan
 }
 
+func (s Slurper) getChannels(params *slack.GetConversationsParameters) (channels []slack.Channel, nextCursor string, err error) {
+	for {
+		channels, cursor, err := s.client.GetConversations(params)
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return channels, cursor, err
+	}
+}
+
 // GetChannels returns all channels in the current workspace of the specified type. If no channel type is supplied, the API defaults to returning public channels.
+// Will return only once all channels have been retrieved
 func (s Slurper) GetChannels(channelTypes ...ChannelType) ([]Channel, error) {
-	var allChannels []Channel
+	var err error
+	var channels []Channel
+
+	channelChan, errorChan := s.GetChannelsAsync(channelTypes...)
+
+Loop:
+	for {
+		select {
+		case channel, ok := <-channelChan:
+			if !ok {
+				break Loop
+			}
+			channels = append(channels, channel)
+		case err = <-errorChan:
+			close(channelChan)
+		}
+	}
+	close(errorChan)
+
+	return channels, err
+}
+
+// GetChannelsAsync returns all channels in the current workspace of the specified type asynchronously using channels. If no channel type is supplied, the API defaults to returning public channels.
+func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, chan error) {
+	channelChan := make(chan Channel)
+	errorChan := make(chan error)
+
 	var types []string
 	for _, t := range channelTypes {
 		types = append(types, string(t))
 	}
 
-	params := &slack.GetConversationsParameters{
-		Types: types,
-	}
-	channels, cursor, err := s.client.GetConversations(params)
-	if err != nil {
-		return nil, err
-	}
-
-	for {
-		for _, channel := range channels {
-			allChannels = append(allChannels, Channel{
-				ID:             channel.ID,
-				Name:           channel.Name,
-				IsPrivate:      channel.IsPrivate,
-				IsGroup:        channel.IsGroup,
-				IsDM:           channel.IsIM,
-				IsGroupMessage: channel.IsMpIM,
-			})
+	go func() {
+		params := &slack.GetConversationsParameters{
+			Types: types,
 		}
 
-		if cursor == "" {
-			break
+		for {
+			channels, cursor, err := s.getChannels(params)
+			if err != nil {
+				errorChan <- err
+				return
+			}
+
+			for _, channel := range channels {
+				channelChan <- Channel{
+					ID:             channel.ID,
+					Name:           channel.Name,
+					IsPrivate:      channel.IsPrivate,
+					IsGroup:        channel.IsGroup,
+					IsDM:           channel.IsIM,
+					IsGroupMessage: channel.IsMpIM,
+				}
+			}
+
+			if cursor == "" {
+				break
+			}
+
+			params.Cursor = cursor
 		}
 
-		params.Cursor = cursor
+		close(channelChan)
+	}()
 
-		channels, cursor, err = s.client.GetConversations(params)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return allChannels, nil
+	return channelChan, errorChan
 }
