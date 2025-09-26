@@ -4,18 +4,26 @@ import (
 	"strings"
 
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/anthropic"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/artifactory"
+	atlassianv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v1"
+	atlassianv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/atlassian/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0managementapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/auth0oauth"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws"
-	awssessionkeys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/awssessionkeys"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azure"
+	awsaccesskeys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/access_keys"
+	awssessionkeys "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/aws/session_keys"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/azuredirectmanagementkey"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/bitbucketapppassword"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/box"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/boxoauth"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/censys"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflareapitoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/cloudflarecakey"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceantoken"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/digitaloceanv2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordbottoken"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/discordwebhook"
+	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/docker"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/dropbox"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ftp"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gcp"
@@ -27,7 +35,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/githubapp"
 	gitlabv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v1"
 	gitlabv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/gitlab/v2"
-	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku"
+	herokuv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku/v1"
+	herokuv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/heroku/v2"
 	jiratokenv1 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v1"
 	jiratokenv2 "github.com/trufflesecurity/trufflehog/v3/pkg/detectors/jiratoken/v2"
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/ldap"
@@ -65,6 +74,22 @@ func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {
 	for _, t := range detectrs {
 		var detector detectors.Detector
 		switch t {
+		case "anthropic":
+			detector = anthropic.Scanner{}
+		case "atlassianv1":
+			detector = atlassianv1.Scanner{}
+		case "atlassianv2":
+			detector = atlassianv2.Scanner{}
+		case "bitbucketapppassword":
+			detector = bitbucketapppassword.Scanner{}
+		case "box":
+			detector = box.Scanner{}
+		case "boxoauth":
+			detector = boxoauth.Scanner{}
+		case "digitaloceanv2":
+			detector = digitaloceanv2.Scanner{}
+		case "docker":
+			detector = docker.Scanner{}
 		case "mongodb":
 			detector = mongodb.Scanner{}
 		case "ldap":
@@ -81,10 +106,10 @@ func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {
 			detector = auth0managementapitoken.Scanner{}
 		case "awssessionkeys":
 			detector = awssessionkeys.New()
-		case "aws":
-			detector = aws.New()
-		case "azure":
-			detector = azure.Scanner{}
+		case "awsaccesskeys":
+			detector = awsaccesskeys.New()
+		case "azuredirectmanagementkey":
+			detector = azuredirectmanagementkey.Scanner{}
 		case "censys":
 			detector = censys.Scanner{}
 		case "cloudflareapitoken":
@@ -115,8 +140,10 @@ func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {
 			detector = gitlabv1.Scanner{}
 		case "gitlabv2":
 			detector = gitlabv2.Scanner{}
-		case "heroku":
-			detector = heroku.Scanner{}
+		case "herokuv1":
+			detector = herokuv1.Scanner{}
+		case "herokuv2":
+			detector = herokuv2.Scanner{}
 		case "jiratokenv1":
 			detector = jiratokenv1.Scanner{}
 		case "jiratokenv2":
