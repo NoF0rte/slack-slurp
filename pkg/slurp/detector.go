@@ -14,6 +14,7 @@ type CustomDetector struct {
 	Name      string   `mapstructure:"name"`
 	Keywordss []string `mapstructure:"keywords"`
 	Patterns  []string `mapstructure:"patterns"`
+	Desc      string   `mapstructure:description`
 }
 
 func (d *CustomDetector) Keywords() []string {
@@ -54,4 +55,8 @@ func (d *CustomDetector) FromData(ctx context.Context, verify bool, data []byte)
 
 func (d *CustomDetector) Type() detectorspb.DetectorType {
 	return detectorType_Custom
+}
+
+func (d *CustomDetector) Description() string {
+	return d.Desc
 }
