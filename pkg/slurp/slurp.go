@@ -79,6 +79,7 @@ type User struct {
 	FullName      string
 	Email         string
 	Username      string
+	Image         string
 	Phone         string
 	Title         string
 	IsAdmin       bool
@@ -580,6 +581,7 @@ func (s Slurper) GetUsers() ([]User, error) {
 			FullName:      user.Profile.RealName,
 			Title:         user.Profile.Title,
 			Email:         user.Profile.Email,
+			Image:         user.Profile.ImageOriginal,
 			Phone:         user.Profile.Phone,
 			Username:      user.Name,
 			IsAdmin:       user.IsAdmin,

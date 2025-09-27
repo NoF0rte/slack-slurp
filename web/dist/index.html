@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slack-Slurp Web Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        .header p {
+            color: #7f8c8d;
+            margin: 10px 0 0 0;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .section h2 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .btn-success {
+            background-color: #27ae60;
+        }
+        .btn-success:hover {
+            background-color: #229954;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+        .error {
+            border-left-color: #e74c3c;
+            background-color: #fdf2f2;
+        }
+        .success {
+            border-left-color: #27ae60;
+            background-color: #f0f9f0;
+        }
+        .loading {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Slack-Slurp Web Dashboard</h1>
+            <p>Web interface for Slack reconnaissance and secret detection</p>
+        </div>
+
+        <div class="grid">
+            <!-- Authentication Section -->
+            <div class="section">
+                <h2>🔐 Authentication</h2>
+                <div class="form-group">
+                    <label for="apiToken">API Token (xoxc- or xoxb-)</label>
+                    <input type="password" id="apiToken" placeholder="Enter your Slack API token">
+                </div>
+                <div class="form-group">
+                    <label for="dCookie">D Cookie (xoxd-)</label>
+                    <input type="password" id="dCookie" placeholder="Enter d cookie (for user auth)">
+                </div>
+                <div class="form-group">
+                    <label for="dsCookie">D-S Cookie</label>
+                    <input type="password" id="dsCookie" placeholder="Enter d-s cookie (optional)">
+                </div>
+                <button class="btn btn-success" onclick="testAuth()">Test Credentials</button>
+                <button class="btn" onclick="setupAuth()">Setup Authentication</button>
+                <div id="authResult"></div>
+            </div>
+
+            <!-- Current User Info -->
+            <div class="section">
+                <h2>👤 Current User</h2>
+                <button class="btn" onclick="getWhoAmI()">Get User Info</button>
+                <div id="userResult"></div>
+            </div>
+
+            <!-- Channels Section -->
+            <div class="section">
+                <h2>📢 Channels</h2>
+                <div class="form-group">
+                    <label for="channelTypes">Channel Types</label>
+                    <select id="channelTypes" multiple>
+                        <option value="public_channel">Public Channels</option>
+                        <option value="private_channel">Private Channels</option>
+                        <option value="im">Direct Messages</option>
+                        <option value="mpim">Group Messages</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="getChannels()">Get Channels</button>
+                <div id="channelsResult"></div>
+            </div>
+
+            <!-- Users Section -->
+            <div class="section">
+                <h2>👥 Users</h2>
+                <button class="btn" onclick="getUsers()">Get Users</button>
+                <div id="usersResult"></div>
+            </div>
+
+            <!-- Search Section -->
+            <div class="section">
+                <h2>🔍 Search Messages</h2>
+                <div class="form-group">
+                    <label for="searchQuery">Search Query</label>
+                    <input type="text" id="searchQuery" placeholder="Enter search terms">
+                </div>
+                <div class="form-group">
+                    <label for="searchChannels">Channels (comma-separated)</label>
+                    <input type="text" id="searchChannels" placeholder="channel1,channel2">
+                </div>
+                <button class="btn" onclick="searchMessages()">Search Messages</button>
+                <div id="searchResult"></div>
+            </div>
+
+            <!-- Secret Scan Section -->
+            <div class="section">
+                <h2>🔒 Secret Scan</h2>
+                <div class="form-group">
+                    <label for="scanChannels">Channels (comma-separated)</label>
+                    <input type="text" id="scanChannels" placeholder="channel1,channel2">
+                </div>
+                <div class="form-group">
+                    <label for="scanDetectors">Detectors (comma-separated)</label>
+                    <input type="text" id="scanDetectors" placeholder="aws,github,slack">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="verifySecrets"> Verify secrets
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="verifiedOnly"> Verified only
+                    </label>
+                </div>
+                <button class="btn btn-danger" onclick="startSecretScan()">Start Secret Scan</button>
+                <div id="scanResult"></div>
+            </div>
+
+            <!-- WebSocket Status -->
+            <div class="section">
+                <h2>🌐 WebSocket Status</h2>
+                <div id="wsStatus" class="status status-disconnected">Disconnected</div>
+                <button class="btn" onclick="connectWebSocket()">Connect</button>
+                <button class="btn" onclick="disconnectWebSocket()">Disconnect</button>
+                <div id="wsMessages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentScanId = null;
+
+        // API Helper Functions
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(`/api${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP ${response.status}`);
+                }
+                
+                return result;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result ${isError ? 'error' : 'success'}"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        }
+
+        function showError(elementId, error) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result error">Error: ${error.message}</div>`;
+        }
+
+        function showLoading(elementId, message = 'Loading...') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result loading">${message}</div>`;
+        }
+
+        // Authentication Functions
+        async function testAuth() {
+            showLoading('authResult', 'Testing credentials...');
+            
+            try {
+                const credentials = {
+                    api_token: document.getElementById('apiToken').value,
+                    d_cookie: document.getElementById('dCookie').value,
+                    ds_cookie: document.getElementById('dsCookie').value
+                };
+                
+                const result = await apiCall('/auth/test', 'POST', credentials);
+                showResult('authResult', result);
+            } catch (error) {
+                showError('authResult', error);
+            }
+        }
+
+        async function setupAuth() {
+            showLoading('authResult', 'Setting up authentication...');
+            
+            try {
+                const credentials = {
+                    api_token: document.getElementById('apiToken').value,
+                    d_cookie: document.getElementById('dCookie').value,
+                    ds_cookie: document.getElementById('dsCookie').value
+                };
+                
+                const result = await apiCall('/auth/setup', 'POST', credentials);
+                showResult('authResult', result);
+            } catch (error) {
+                showError('authResult', error);
+            }
+        }
+
+        // User Functions
+        async function getWhoAmI() {
+            showLoading('userResult', 'Getting user info...');
+            
+            try {
+                const result = await apiCall('/whoami');
+                showResult('userResult', result);
+            } catch (error) {
+                showError('userResult', error);
+            }
+        }
+
+        // Channel Functions
+        async function getChannels() {
+            showLoading('channelsResult', 'Getting channels...');
+            
+            try {
+                const channelTypes = Array.from(document.getElementById('channelTypes').selectedOptions)
+                    .map(option => option.value);
+                
+                const params = new URLSearchParams();
+                channelTypes.forEach(type => params.append('type', type));
+                
+                const result = await apiCall(`/channels?${params.toString()}`);
+                showResult('channelsResult', result);
+            } catch (error) {
+                showError('channelsResult', error);
+            }
+        }
+
+        // User Functions
+        async function getUsers() {
+            showLoading('usersResult', 'Getting users...');
+            
+            try {
+                const result = await apiCall('/users');
+                showResult('usersResult', result);
+            } catch (error) {
+                showError('usersResult', error);
+            }
+        }
+
+        // Search Functions
+        async function searchMessages() {
+            showLoading('searchResult', 'Searching messages...');
+            
+            try {
+                const searchData = {
+                    query: document.getElementById('searchQuery').value,
+                    channels: document.getElementById('searchChannels').value.split(',').map(s => s.trim()).filter(s => s)
+                };
+                
+                const result = await apiCall('/search/messages', 'POST', searchData);
+                showResult('searchResult', result);
+            } catch (error) {
+                showError('searchResult', error);
+            }
+        }
+
+        // Secret Scan Functions
+        async function startSecretScan() {
+            showLoading('scanResult', 'Starting secret scan...');
+            
+            try {
+                const scanData = {
+                    channels: document.getElementById('scanChannels').value.split(',').map(s => s.trim()).filter(s => s),
+                    detectors: document.getElementById('scanDetectors').value.split(',').map(s => s.trim()).filter(s => s),
+                    verify: document.getElementById('verifySecrets').checked,
+                    verified_only: document.getElementById('verifiedOnly').checked
+                };
+                
+                const result = await apiCall('/secrets/scan', 'POST', scanData);
+                currentScanId = result.scan_id;
+                showResult('scanResult', result);
+                
+                // Connect to WebSocket for scan updates
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'subscribe_scan',
+                        scan_id: currentScanId
+                    }));
+                }
+            } catch (error) {
+                showError('scanResult', error);
+            }
+        }
+
+        // WebSocket Functions
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            ws = new WebSocket(`ws://${window.location.host}/ws/dashboard`);
+            
+            ws.onopen = function() {
+                document.getElementById('wsStatus').textContent = 'Connected';
+                document.getElementById('wsStatus').className = 'status status-connected';
+                addWsMessage('Connected to WebSocket');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                addWsMessage(`Received: ${JSON.stringify(data, null, 2)}`);
+            };
+            
+            ws.onclose = function() {
+                document.getElementById('wsStatus').textContent = 'Disconnected';
+                document.getElementById('wsStatus').className = 'status status-disconnected';
+                addWsMessage('Disconnected from WebSocket');
+            };
+            
+            ws.onerror = function(error) {
+                addWsMessage(`WebSocket error: ${error}`);
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function addWsMessage(message) {
+            const element = document.getElementById('wsMessages');
+            const timestamp = new Date().toLocaleTimeString();
+            element.innerHTML += `<div class="result"><strong>${timestamp}:</strong> ${message}</div>`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default channel types
+            const channelTypesSelect = document.getElementById('channelTypes');
+            Array.from(channelTypesSelect.options).forEach(option => {
+                option.selected = true;
+            });
+        });
+    </script>
+</body>
+</html>
