@@ -14,7 +14,7 @@ type CustomDetector struct {
 	Name      string   `mapstructure:"name"`
 	Keywordss []string `mapstructure:"keywords"`
 	Patterns  []string `mapstructure:"patterns"`
-	Desc      string   `mapstructure:description`
+	Desc      string   `mapstructure:"description"`
 }
 
 func (d *CustomDetector) Keywords() []string {
