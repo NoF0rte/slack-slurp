@@ -43,7 +43,7 @@ type WSMessage struct {
 func (h *APIHandler) TestAuth(c *gin.Context) {
 	authTest, err := h.slurper.AuthTest()
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -63,18 +63,16 @@ func (h *APIHandler) SetupAuth(c *gin.Context) {
 	}
 
 	// Update config
-	h.config.APIToken = creds.APIToken
-	h.config.DCookie = creds.DCookie
-	h.config.DSCookie = creds.DSCookie
+	h.slurper.UpdateCreds(creds.APIToken, creds.DCookie, creds.DSCookie)
 
 	// Test the credentials
-	_, err := h.slurper.AuthTest()
+	authTest, err := h.slurper.AuthTest()
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
+	c.JSON(http.StatusOK, authTest)
 }
 
 func (h *APIHandler) GetConfig(c *gin.Context) {

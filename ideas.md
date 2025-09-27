@@ -1,0 +1,8 @@
+- Profile creation
+  - Instead of doing the auth setup, we force creating a profile if it doesn't exist in the local storage or if the server says we don't have any profiles
+  - If the server says we have profiles, store them in local storage
+  - When a profile gets created, store it in local storage and on the server
+  - Add an option to export profiles
+  - To create a profile, the user must supply a name, the API token, and the d and d-s cookies. What is stored locally should just be the name and the results from calling the auth test endpoint. The name, API token, and the d and d-s cookies all get sent to the server and stored
+- Have a profile selection drop down
+  - When the profile is selected, set that as the current profile in the UI and send a request to the server stating which profile to use

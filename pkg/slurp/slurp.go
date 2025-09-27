@@ -200,34 +200,37 @@ type Slurper struct {
 	detectors []detectors.Detector
 }
 
-// New returns a new Slurper instance
-func New(cfg *Config) Slurper {
+func newSlackHTTPClient(dCookie string, dsCookie string) *http.Client {
 	jar, _ := cookiejar.New(nil)
 	url, _ := url.Parse("https://slack.com")
 	jar.SetCookies(url, []*http.Cookie{
 		{
 			Name:   "d",
-			Value:  cfg.DCookie,
+			Value:  dCookie,
 			Path:   "/",
 			Domain: "slack.com",
 		},
 	})
 
-	if cfg.DSCookie != "" {
+	if dsCookie != "" {
 		jar.SetCookies(url, []*http.Cookie{
 			{
 				Name:   "d-s",
-				Value:  cfg.DSCookie,
+				Value:  dsCookie,
 				Path:   "/",
 				Domain: "slack.com",
 			},
 		})
 	}
 
-	client := &http.Client{
+	return &http.Client{
 		Jar: jar,
 	}
+}
 
+// New returns a new Slurper instance
+func New(cfg *Config) Slurper {
+	client := newSlackHTTPClient(cfg.DCookie, cfg.DSCookie)
 	return Slurper{
 		client:    slack.New(cfg.APIToken, slack.OptionHTTPClient(client)),
 		config:    cfg,
@@ -243,6 +246,15 @@ func (s Slurper) AuthTest() (*slack.AuthTestResponse, error) {
 	}
 
 	return resp, nil
+}
+
+func (s *Slurper) UpdateCreds(apiToken string, dCookie string, dsCookie string) {
+	s.config.APIToken = apiToken
+	s.config.DCookie = dCookie
+	s.config.DSCookie = dsCookie
+
+	client := newSlackHTTPClient(dCookie, dsCookie)
+	s.client = slack.New(apiToken, slack.OptionHTTPClient(client))
 }
 
 // SearchMessages will search Slack messages for the specified query. Will return only once all matched messages have been retrieved.

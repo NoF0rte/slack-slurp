@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	"net/http"
+	"path/filepath"
 
 	"github.com/NoF0rte/slack-slurp/internal/api"
-	"github.com/NoF0rte/slack-slurp/internal/middleware"
+	"github.com/NoF0rte/slack-slurp/internal/static"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 )
@@ -25,20 +26,17 @@ This provides a web interface for all slack-slurp functionality.`,
 		// Create Gin router
 		router := gin.Default()
 
-		// Add middleware
-		router.Use(middleware.CORS())
-		router.Use(middleware.Logger())
-
 		// Setup API routes
 		api.SetupRoutes(router, slurper, &config)
 
-		// Serve static files from web/dist directory
-		router.Static("/", "./web/dist")
+		// Serve static files from embedded FS
+		router.StaticFileFS("/", "/", http.FS(static.FS)) // Must be / that we query from the embedded FS, otherwise Gin will go into a redirect loop
+		router.GET("/assets/*filepath", func(ctx *gin.Context) {
+			file, _ := ctx.Params.Get("filepath")
+			ctx.FileFromFS(filepath.Join("assets", file), http.FS(static.FS))
+		})
 
 		addr := fmt.Sprintf("localhost:%s", port)
-		log.Printf("Starting web server on %s", addr)
-		log.Printf("Web dashboard available at http://%s", addr)
-
 		return router.Run(addr)
 	},
 }
