@@ -18,6 +18,8 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors"
 )
 
+var urlPattern = regexp.MustCompile(`\bhttps?:\/\/[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})?(?::\d{1,5})?(?:\/[^\s|]*)?(?:\?[^\s|]*)?(?:#[^\s|]*)?\b`)
+
 // ChannelType represents the different channels in Slack
 type ChannelType string
 
@@ -774,6 +776,76 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 	}()
 
 	return domainChan, errorChan
+}
+
+// GetURLs searches Slack URLs. Will return only once all URLs have been retrieved.
+func (s Slurper) GetURLs(options ...SearchOption) ([]string, error) {
+	urlChan, errorChan := s.GetURLsAsync(options...)
+
+	var err error
+	var allURLs []string
+
+Loop:
+	for {
+		select {
+		case u, ok := <-urlChan:
+			if !ok {
+				break Loop
+			}
+			allURLs = append(allURLs, u)
+		case err = <-errorChan:
+			close(urlChan)
+		}
+	}
+	close(errorChan)
+
+	return allURLs, err
+}
+
+func (s Slurper) GetURLsAsync(options ...SearchOption) (chan string, chan error) {
+	urlChan := make(chan string)
+	errorChan := make(chan error)
+
+	keywords := []string{"http://", "https://"}
+	go func() {
+		urlSet := treeset.NewWithStringComparator()
+		for _, keyword := range keywords {
+			var err error
+			messageChan, err2Chan := s.SearchMessagesAsync(keyword, options...)
+
+		Loop:
+			for {
+				select {
+				case message, ok := <-messageChan:
+					if !ok {
+						break Loop
+					}
+					matches := urlPattern.FindAllString(message.Text, -1)
+
+					for _, match := range matches {
+						if urlSet.Contains(match) {
+							continue
+						}
+
+						urlSet.Add(match)
+						urlChan <- match
+					}
+				case err = <-err2Chan:
+					close(messageChan)
+				}
+			}
+			close(err2Chan)
+
+			if err != nil {
+				errorChan <- err
+				return
+			}
+		}
+
+		close(urlChan)
+	}()
+
+	return urlChan, errorChan
 }
 
 func (s Slurper) getChannels(params *slack.GetConversationsParameters) (channels []slack.Channel, nextCursor string, err error) {
