@@ -64,7 +64,6 @@ type Channel struct {
 	IsChannel        bool           `json:"is_channel"`
 	IsArchived       bool           `json:"is_archived"`
 	IsPrivate        bool           `json:"is_private"`
-	IsGroup          bool           `json:"is_group"`
 	IsDM             bool           `json:"is_im"`
 	IsGroupMessage   bool           `json:"is_mpim"`
 	NumMembers       int            `json:"num_members"`
@@ -982,8 +981,7 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 					Topic:            channel.Topic.Value,
 					IsChannel:        channel.IsChannel,
 					IsArchived:       channel.IsArchived,
-					IsPrivate:        channel.IsPrivate,
-					IsGroup:          channel.IsGroup,
+					IsPrivate:        channel.IsPrivate || channel.IsGroup,
 					IsDM:             channel.IsIM,
 					IsGroupMessage:   channel.IsMpIM,
 					NumMembers:       channel.NumMembers,

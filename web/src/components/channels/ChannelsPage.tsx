@@ -37,10 +37,10 @@ export function ChannelsPage() {
   })
 
   const groupedChannels = {
-    public: filteredChannels.filter(ch => ch.is_channel && !ch.is_private && !ch.is_archived),
-    private: filteredChannels.filter(ch => ch.is_channel && ch.is_private && !ch.is_archived),
-    direct: filteredChannels.filter(ch => ch.is_im && !ch.is_archived),
-    group: filteredChannels.filter(ch => ch.is_group && !ch.is_archived),
+    public: filteredChannels.filter(ch => !ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im),
+    private: filteredChannels.filter(ch => ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im),
+    direct: filteredChannels.filter(ch => ch.is_im),
+    group: filteredChannels.filter(ch => ch.is_mpim),
     archived: filteredChannels.filter(ch => ch.is_archived),
   }
 
