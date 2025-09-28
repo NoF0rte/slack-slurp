@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ChannelsPage } from './channels/ChannelsPage'
+import { UsersPage } from './users/UsersPage'
 
 type Route = 'dashboard' | 'channels' | 'users' | 'search' | 'secrets' | 'settings'
 
@@ -27,7 +28,7 @@ export function Router() {
       case 'channels':
         return <ChannelsPage />
       case 'users':
-        return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">Users</h1><p className="text-gray-500">Users page coming soon...</p></div>
+        return <UsersPage />
       case 'search':
         return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">Search</h1><p className="text-gray-500">Search page coming soon...</p></div>
       case 'secrets':

@@ -30,32 +30,17 @@ export interface Channel {
 }
 
 export interface User {
-  id: string
   name: string
   real_name: string
-  profile: {
-    email?: string
-    phone?: string
-    title?: string
-    status_text?: string
-    status_emoji?: string
-    image_24?: string
-    image_32?: string
-    image_48?: string
-    image_72?: string
-    image_192?: string
-    image_512?: string
-  }
+  email: string
+  username: string
+  image: string
+  phone: string
+  title: string
   is_admin: boolean
   is_owner: boolean
-  is_primary_owner: boolean
-  is_restricted: boolean
-  is_ultra_restricted: boolean
   is_bot: boolean
   deleted: boolean
-  tz?: string
-  tz_label?: string
-  tz_offset?: number
 }
 
 export interface Message {

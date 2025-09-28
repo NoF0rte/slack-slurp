@@ -48,7 +48,7 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200">
+      <div className="bottom-0 left-0 right-0 p-6 border-t border-gray-200">
         {currentUser && (
           <div className="mb-4">
             <div className="flex items-center">

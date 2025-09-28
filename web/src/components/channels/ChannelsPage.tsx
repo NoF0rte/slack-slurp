@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useChannelsStore } from '../../stores/channelsStore'
 import { ChannelCard } from './ChannelCard'
+import { downloadJSON, generateFilename, getCurrentTimestamp } from '../../utils/export'
 import { 
   FunnelIcon, 
   ArrowPathIcon,
-  ExclamationTriangleIcon 
+  ExclamationTriangleIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline'
 
 type ChannelType = 'all' | 'public' | 'private' | 'direct' | 'group'
@@ -64,6 +66,17 @@ export function ChannelsPage() {
     fetchChannels(types)
   }
 
+  const handleExportChannels = () => {
+    const timestamp = getCurrentTimestamp()
+    const filename = generateFilename('channels', timestamp)
+    
+    downloadJSON({
+      filename,
+      data: filteredChannels,
+      timestamp
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -73,14 +86,25 @@ export function ChannelsPage() {
           <p className="text-gray-500">Browse and explore available channels</p>
         </div>
         
-        <button
-          onClick={handleRefresh}
-          disabled={isLoading}
-          className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleExportChannels}
+            disabled={isLoading || filteredChannels.length === 0}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ArrowDownTrayIcon className="w-4 h-4" />
+            <span>Export Channels</span>
+          </button>
+          
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -114,7 +138,7 @@ export function ChannelsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, topic, or purpose..."
+                placeholder="Search by name or topic..."
                 className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <FunnelIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />

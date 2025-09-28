@@ -6,3 +6,5 @@
   - To create a profile, the user must supply a name, the API token, and the d and d-s cookies. What is stored locally should just be the name and the results from calling the auth test endpoint. The name, API token, and the d and d-s cookies all get sent to the server and stored
 - Have a profile selection drop down
   - When the profile is selected, set that as the current profile in the UI and send a request to the server stating which profile to use
+- Import users/channels just in case?
+- History of domains and searches
