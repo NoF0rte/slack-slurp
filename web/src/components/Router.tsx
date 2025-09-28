@@ -1,0 +1,75 @@
+import { useState, useEffect } from 'react'
+import { ChannelsPage } from './channels/ChannelsPage'
+
+type Route = 'dashboard' | 'channels' | 'users' | 'search' | 'secrets' | 'settings'
+
+export function Router() {
+  const [currentRoute, setCurrentRoute] = useState<Route>('dashboard')
+
+  // Simple hash-based routing
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1) as Route
+      if (hash && ['dashboard', 'channels', 'users', 'search', 'secrets', 'settings'].includes(hash)) {
+        setCurrentRoute(hash)
+      } else {
+        setCurrentRoute('dashboard')
+      }
+    }
+
+    handleHashChange()
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  const renderRoute = () => {
+    switch (currentRoute) {
+      case 'channels':
+        return <ChannelsPage />
+      case 'users':
+        return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">Users</h1><p className="text-gray-500">Users page coming soon...</p></div>
+      case 'search':
+        return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">Search</h1><p className="text-gray-500">Search page coming soon...</p></div>
+      case 'secrets':
+        return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">Secret Scanner</h1><p className="text-gray-500">Secret scanner page coming soon...</p></div>
+      case 'settings':
+        return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">Settings</h1><p className="text-gray-500">Settings page coming soon...</p></div>
+      case 'dashboard':
+      default:
+        return (
+          <div className="p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">
+              🚀 Slack-Slurp Dashboard
+            </h1>
+            <p className="text-gray-500 mb-6">
+              Welcome to the Slack reconnaissance and secret detection dashboard.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Channels</h2>
+                <p className="text-gray-500 mb-4">Browse and explore available channels</p>
+                <a href="#channels" className="text-blue-600 hover:text-blue-800 font-medium">View Channels →</a>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Users</h2>
+                <p className="text-gray-500 mb-4">View workspace users and their information</p>
+                <a href="#users" className="text-blue-600 hover:text-blue-800 font-medium">View Users →</a>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Search</h2>
+                <p className="text-gray-500 mb-4">Search messages and files across channels</p>
+                <a href="#search" className="text-blue-600 hover:text-blue-800 font-medium">Search →</a>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Secret Scanner</h2>
+                <p className="text-gray-500 mb-4">Scan for secrets and sensitive information</p>
+                <a href="#secrets" className="text-blue-600 hover:text-blue-800 font-medium">Start Scan →</a>
+              </div>
+            </div>
+          </div>
+        )
+    }
+  }
+
+  return renderRoute()
+}

@@ -53,14 +53,14 @@ import (
 )
 
 type Config struct {
-	APIToken string `mapstructure:"api-token"`
-	DCookie  string `mapstructure:"d-cookie"`
-	DSCookie string `mapstructure:"ds-cookie"`
+	APIToken string `mapstructure:"api-token" json:"api_token"`
+	DCookie  string `mapstructure:"d-cookie" json:"d_cookie"`
+	DSCookie string `mapstructure:"ds-cookie" json:"ds_cookie"`
 	// Files       []string `mapstructure:"files"`
-	Domains         []string `mapstructure:"domains"`
-	Detectors       []string `mapstructure:"detectors"`
-	Threads         int
-	CustomDetectors []CustomDetector `mapstructure:"custom-detectors"`
+	Domains         []string         `mapstructure:"domains" json:"domains"`
+	Detectors       []string         `mapstructure:"detectors" json:"detectors"`
+	Threads         int              `json:"threads"`
+	CustomDetectors []CustomDetector `mapstructure:"custom-detectors" json:"custom_detectors"`
 }
 
 func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {

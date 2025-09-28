@@ -10,12 +10,12 @@ import {
 import { useAuthStore } from '../../stores/authStore'
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Search', href: '/search', icon: MagnifyingGlassIcon },
-  { name: 'Secret Scanner', href: '/secrets', icon: ShieldCheckIcon },
-  { name: 'Channels', href: '/channels', icon: ChatBubbleLeftRightIcon },
-  { name: 'Users', href: '/users', icon: UsersIcon },
-  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
+  { name: 'Dashboard', href: '#dashboard', icon: HomeIcon },
+  { name: 'Search', href: '#search', icon: MagnifyingGlassIcon },
+  { name: 'Secret Scanner', href: '#secrets', icon: ShieldCheckIcon },
+  { name: 'Channels', href: '#channels', icon: ChatBubbleLeftRightIcon },
+  { name: 'Users', href: '#users', icon: UsersIcon },
+  { name: 'Settings', href: '#settings', icon: Cog6ToothIcon },
 ]
 
 export function Sidebar() {

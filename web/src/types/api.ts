@@ -5,14 +5,12 @@ export interface Credentials {
 }
 
 export interface AuthTestResult {
-  ok: boolean
   url: string
   team: string
   user: string
   team_id: string
   user_id: string
   bot_id?: string
-  is_enterprise_install?: boolean
 }
 
 export interface Channel {
@@ -26,18 +24,10 @@ export interface Channel {
   is_archived: boolean
   is_general: boolean
   created: number
-  creator: string
-  members?: string[]
-  topic?: {
-    value: string
-    creator: string
-    last_set: number
-  }
-  purpose?: {
-    value: string
-    creator: string
-    last_set: number
-  }
+  // creator: string
+  num_members: number
+  // members?: string[]
+  topic?: string
 }
 
 export interface User {

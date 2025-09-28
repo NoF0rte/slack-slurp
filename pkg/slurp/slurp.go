@@ -31,10 +31,10 @@ const (
 )
 
 type Message struct {
-	User    string
-	Date    time.Time
-	Channel string
-	Text    string
+	User    string              `json:"user"`
+	Date    time.Time           `json:"date"`
+	Channel string              `json:"channel"`
+	Text    string              `json:"text"`
 	Raw     slack.SearchMessage `json:"-"`
 }
 
@@ -48,58 +48,59 @@ func (m Message) ToJson() (string, error) {
 }
 
 type File struct {
-	Name     string
-	Created  time.Time
-	Channels []string
-	URL      string
-	Filetype string
-	User     string
-	Raw      slack.File
+	Name     string     `json:"name"`
+	Created  time.Time  `json:"created"`
+	Channels []string   `json:"channels"`
+	URL      string     `json:"url"`
+	Filetype string     `json:"filetype"`
+	User     string     `json:"user"`
+	Raw      slack.File `json:"-"`
 }
 
 type Channel struct {
-	ID               string
-	Name             string
-	Topic            string
-	IsChannel        bool
-	IsArchived       bool
-	IsPrivate        bool
-	IsGroup          bool
-	IsDM             bool
-	IsGroupMessage   bool
-	NumMembers       int
-	ConnectedTeamIDs []string
-	SharedTeamIDs    []string
-	InternalTeamIDs  []string
+	ID               string         `json:"id"`
+	Name             string         `json:"name"`
+	Topic            string         `json:"topic"`
+	IsChannel        bool           `json:"is_channel"`
+	IsArchived       bool           `json:"is_archived"`
+	IsPrivate        bool           `json:"is_private"`
+	IsGroup          bool           `json:"is_group"`
+	IsDM             bool           `json:"is_im"`
+	IsGroupMessage   bool           `json:"is_mpim"`
+	NumMembers       int            `json:"num_members"`
+	Created          slack.JSONTime `json:"created"`
+	ConnectedTeamIDs []string       `json:"connected_team_ids"`
+	SharedTeamIDs    []string       `json:"shared_team_ids"`
+	InternalTeamIDs  []string       `json:"internal_team_ids"`
 }
 
 type User struct {
-	FirstName     string
-	LastName      string
-	FullName      string
-	Email         string
-	Username      string
-	Image         string
-	Phone         string
-	Title         string
-	IsAdmin       bool
-	IsBot         bool
-	IsOwner       bool
-	Has2FA        bool
-	TwoFactorType string
-	Deleted       bool
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	FullName      string `json:"real_name"`
+	Email         string `json:"email"`
+	Username      string `json:"name"`
+	Image         string `json:"image"`
+	Phone         string `json:"phone"`
+	Title         string `json:"title"`
+	IsAdmin       bool   `json:"is_admin"`
+	IsBot         bool   `json:"is_bot"`
+	IsOwner       bool   `json:"is_owner"`
+	Has2FA        bool   `json:"has_2fa"`
+	TwoFactorType string `json:"two_factor_type"`
+	Deleted       bool   `json:"deleted"`
 }
 
 type Secret struct {
 	// Raw contains the raw secret identifier data.
-	Raw      string
-	Verified bool
+	Raw      string `json:"raw"`
+	Verified bool   `json:"verified"`
 }
 
 type SecretResult struct {
-	Type    string
-	Message Message
-	Secrets []Secret
+	Type    string   `json:"type"`
+	Message Message  `json:"message"`
+	Secrets []Secret `json:"secrets"`
 }
 
 // Verified returns a new SecretResult containing only the verified secrets
@@ -862,11 +863,64 @@ func (s Slurper) GetURLsAsync(options ...SearchOption) (chan string, chan error)
 	return urlChan, errorChan
 }
 
-func (s Slurper) getChannels(params *slack.GetConversationsParameters) (channels []slack.Channel, nextCursor string, err error) {
+func (s Slurper) getChannelInfo(channelID string) (*slack.Channel, error) {
 	for {
-		channels, cursor, err := s.client.GetConversations(params)
+		channel, err := s.client.GetConversationInfo(&slack.GetConversationInfoInput{ChannelID: channelID})
 		if s.handleRateLimit(err) {
 			continue
+		}
+
+		return channel, err
+	}
+}
+
+func (s Slurper) getUsersInfo(users ...string) (*[]slack.User, error) {
+	for {
+		users, err := s.client.GetUsersInfo(users...)
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return users, err
+	}
+}
+
+func (s Slurper) getChannels(params *slack.GetConversationsParameters) ([]*slack.Channel, string, error) {
+	for {
+		chans, cursor, err := s.client.GetConversations(params)
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		var channels []*slack.Channel
+		dmMap := make(map[string]*slack.Channel)
+		var userIds []string
+		for _, c := range chans {
+			if c.IsIM {
+				dmMap[c.User] = &c
+				userIds = append(userIds, c.User)
+			}
+
+			channels = append(channels, &c)
+		}
+
+		if len(userIds) != 0 {
+			users, err2 := s.getUsersInfo(userIds...)
+			if err2 != nil {
+				fmt.Println(err2)
+			}
+
+			if users != nil {
+				for _, user := range *users {
+					name := user.Name
+					if user.RealName != "" {
+						name = user.RealName
+					}
+
+					channel := dmMap[user.ID]
+					channel.Name = name
+				}
+			}
 		}
 
 		return channels, cursor, err
@@ -933,6 +987,7 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 					IsDM:             channel.IsIM,
 					IsGroupMessage:   channel.IsMpIM,
 					NumMembers:       channel.NumMembers,
+					Created:          channel.Created,
 					ConnectedTeamIDs: channel.ConnectedTeamIDs,
 					SharedTeamIDs:    channel.SharedTeamIDs,
 					InternalTeamIDs:  channel.InternalTeamIDs,

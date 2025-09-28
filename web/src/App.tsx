@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Layout } from './components/layout/Layout'
 import { AuthSetup } from './components/auth/AuthSetup'
+import { Router } from './components/Router'
 import { useAuthStore } from './stores/authStore'
 
 function App() {
@@ -47,14 +48,7 @@ function App() {
 
   return (
     <Layout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          🚀 Slack-Slurp Dashboard
-        </h1>
-        <p className="text-gray-500">
-          Welcome to the Slack reconnaissance and secret detection dashboard.
-        </p>
-      </div>
+      <Router />
     </Layout>
   )
 }

@@ -1,11 +1,33 @@
+import { useState, useEffect } from 'react'
 import { BellIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 export function Header() {
+  const [currentPage, setCurrentPage] = useState('Dashboard')
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1)
+      const pageTitles: Record<string, string> = {
+        dashboard: 'Dashboard',
+        channels: 'Channels',
+        users: 'Users',
+        search: 'Search',
+        secrets: 'Secret Scanner',
+        settings: 'Settings'
+      }
+      setCurrentPage(pageTitles[hash] || 'Dashboard')
+    }
+
+    handleHashChange()
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{currentPage}</h1>
           <p className="text-sm text-gray-500">Slack reconnaissance and secret detection</p>
         </div>
         
