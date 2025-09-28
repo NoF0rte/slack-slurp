@@ -16,13 +16,13 @@ export function ChannelCard({ channel }: ChannelCardProps) {
     if (channel.is_archived) {
       return <ArchiveBoxIcon className="w-5 h-5 text-gray-400" />
     }
+
+    if (channel.is_mpim) {
+      return <UserGroupIcon className="w-5 h-5 text-blue-500" />
+    }
     
     if (channel.is_private) {
       return <LockClosedIcon className="w-5 h-5 text-red-500" />
-    }
-    
-    if (channel.is_mpim) {
-      return <UserGroupIcon className="w-5 h-5 text-blue-500" />
     }
     
     if (channel.is_im) {
@@ -34,7 +34,7 @@ export function ChannelCard({ channel }: ChannelCardProps) {
   
   const getChannelType = () => {
     if (channel.is_archived) return 'Archived'
-    if (channel.is_mpim && channel.is_private) return 'Group Message'
+    if (channel.is_mpim) return 'Group Message'
     if (channel.is_private) return 'Private Channel'
     if (channel.is_im) return 'Direct Message'
     return 'Public Channel'
