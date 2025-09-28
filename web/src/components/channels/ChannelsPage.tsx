@@ -6,7 +6,9 @@ import {
   FunnelIcon, 
   ArrowPathIcon,
   ExclamationTriangleIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline'
 
 type ChannelType = 'all' | 'public' | 'private' | 'direct' | 'group'
@@ -23,6 +25,7 @@ export function ChannelsPage() {
   const { channels, isLoading, error, fetchChannels, clearError } = useChannelsStore()
   const [selectedType, setSelectedType] = useState<ChannelType>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
@@ -77,20 +80,27 @@ export function ChannelsPage() {
     })
   }
 
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Channels</h1>
-          <p className="text-gray-500">Browse and explore available channels</p>
+          <h1 className="text-2xl font-bold text-white">Channels</h1>
+          <p className="text-gray-400">Browse and explore available channels</p>
         </div>
         
         <div className="flex items-center space-x-3">
           <button
             onClick={handleExportChannels}
             disabled={isLoading || filteredChannels.length === 0}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-2 px-4 py-2 bg-slack-blue text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ArrowDownTrayIcon className="w-4 h-4" />
             <span>Export Channels</span>
@@ -99,7 +109,7 @@ export function ChannelsPage() {
           <button
             onClick={handleRefresh}
             disabled={isLoading}
-            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm font-medium text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -108,17 +118,17 @@ export function ChannelsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Channel Type Filter */}
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
               Channel Type
             </label>
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value as ChannelType)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {channelTypeOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -130,7 +140,7 @@ export function ChannelsPage() {
 
           {/* Search */}
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
               Search Channels
             </label>
             <div className="relative">
@@ -139,7 +149,7 @@ export function ChannelsPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name or topic..."
-                className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 pl-10 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
               />
               <FunnelIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             </div>
@@ -149,17 +159,17 @@ export function ChannelsPage() {
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="bg-red-900 border border-red-700 rounded-md p-4">
           <div className="flex items-center">
             <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-2" />
             <div>
-              <h3 className="text-sm font-medium text-red-800">Error loading channels</h3>
-              <p className="text-sm text-red-600 mt-1">{error}</p>
+              <h3 className="text-sm font-medium text-red-200">Error loading channels</h3>
+              <p className="text-sm text-red-300 mt-1">{error}</p>
             </div>
           </div>
           <button
             onClick={clearError}
-            className="mt-3 text-sm text-red-600 hover:text-red-800"
+            className="mt-3 text-sm text-red-300 hover:text-red-200 cursor-pointer"
           >
             Dismiss
           </button>
@@ -170,8 +180,8 @@ export function ChannelsPage() {
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center space-x-2">
-            <ArrowPathIcon className="w-5 h-5 animate-spin text-blue-500" />
-            <span className="text-gray-500">Loading channels...</span>
+            <ArrowPathIcon className="w-5 h-5 animate-spin text-blue-400" />
+            <span className="text-gray-400">Loading channels...</span>
           </div>
         </div>
       )}
@@ -181,34 +191,47 @@ export function ChannelsPage() {
         <div className="space-y-6">
           {Object.entries(groupedChannels).map(([group, groupChannels]) => {
             if (groupChannels.length === 0) return null
+            const isCollapsed = collapsedSections[group]
             
             return (
               <div key={group}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {getGroupTitle(group as keyof typeof groupedChannels)}
-                  </h2>
-                  <span className="text-sm text-gray-500">
+                <div 
+                  className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-800 rounded-md p-2 -m-2"
+                  onClick={() => toggleSection(group)}
+                >
+                  <div className="flex items-center space-x-2">
+                    {isCollapsed ? (
+                      <ChevronRightIcon className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                    )}
+                    <h2 className="text-lg font-semibold text-white">
+                      {getGroupTitle(group as keyof typeof groupedChannels)}
+                    </h2>
+                  </div>
+                  <span className="text-sm text-gray-400">
                     {getGroupCount(group as keyof typeof groupedChannels)} channel{getGroupCount(group as keyof typeof groupedChannels) !== 1 ? 's' : ''}
                   </span>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {groupChannels.map((channel) => (
-                    <ChannelCard key={channel.id} channel={channel} />
-                  ))}
-                </div>
+                {!isCollapsed && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {groupChannels.map((channel) => (
+                      <ChannelCard key={channel.id} channel={channel} />
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
           
           {filteredChannels.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-gray-400 mb-4">
+              <div className="text-gray-500 mb-4">
                 <FunnelIcon className="w-12 h-12 mx-auto" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No channels found</h3>
-              <p className="text-gray-500">
+              <h3 className="text-lg font-medium text-white mb-2">No channels found</h3>
+              <p className="text-gray-400">
                 {searchQuery 
                   ? `No channels match your search "${searchQuery}"`
                   : 'No channels available for the selected type'

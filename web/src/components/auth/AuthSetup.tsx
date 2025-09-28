@@ -54,15 +54,15 @@ export function AuthSetup() {
   }
   
   return (
-    <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
+    <div className="max-w-md mx-auto bg-gray-800 rounded-lg shadow-lg p-8 border border-gray-700">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-purple-600 mb-2">Slack-Slurp</h1>
-        <p className="text-gray-500">Connect your Slack workspace</p>
+        <h1 className="text-2xl font-bold text-white mb-2">Slack-Slurp</h1>
+        <p className="text-gray-400">Connect your Slack workspace</p>
       </div>
       
       <form className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-2">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
             API Token
           </label>
           <input
@@ -72,16 +72,16 @@ export function AuthSetup() {
               ...credentials,
               api_token: e.target.value
             })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
             placeholder="xoxb-your-token-here or xoxc-your-token-here"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Use xoxb- for bot tokens or xoxc- for user tokens
           </p>
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-2">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
             D Cookie (Optional)
           </label>
           <input
@@ -91,16 +91,16 @@ export function AuthSetup() {
               ...credentials,
               d_cookie: e.target.value
             })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
             placeholder="xoxd-your-cookie-here"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Required for user authentication, not needed for bot tokens
           </p>
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-2">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
             D-S Cookie (Optional)
           </label>
           <input
@@ -110,10 +110,10 @@ export function AuthSetup() {
               ...credentials,
               ds_cookie: e.target.value
             })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
             placeholder="d-s-cookie-value"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Additional cookie for enhanced authentication
           </p>
         </div>
@@ -123,7 +123,7 @@ export function AuthSetup() {
             type="button"
             onClick={handleTest}
             disabled={isLoading || !credentials.api_token.trim()}
-            className="w-full px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {isLoading ? 'Testing...' : 'Test Credentials'}
           </button>
@@ -132,21 +132,21 @@ export function AuthSetup() {
             type="button"
             onClick={handleSetup}
             disabled={isLoading || !credentials.api_token.trim()}
-            className="w-full px-4 py-2 bg-purple-600 text-white rounded-md font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full px-4 py-2 bg-slack-purple text-white rounded-md font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {isLoading ? 'Setting up...' : 'Setup Authentication'}
           </button>
         </div>
         
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-3">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="bg-red-900 border border-red-700 rounded-md p-3">
+            <p className="text-sm text-red-200">{error}</p>
           </div>
         )}
         
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-md p-3">
-            <p className="text-sm text-green-600">{success}</p>
+          <div className="bg-green-900 border border-green-700 rounded-md p-3">
+            <p className="text-sm text-green-200">{success}</p>
           </div>
         )}
       </form>

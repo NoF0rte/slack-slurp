@@ -49,40 +49,40 @@ export function ChannelCard({ channel }: ChannelCardProps) {
   }
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 hover:shadow-md hover:bg-gray-750 transition-all">
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3">
           {getChannelIcon()}
           <div>
-            <h3 className="font-medium text-gray-900">
+            <h3 className="font-medium text-white">
               {channel.name || 'Unnamed Channel'}
             </h3>
-            <p className="text-sm text-gray-500">{getChannelType()}</p>
+            <p className="text-sm text-gray-400">{getChannelType()}</p>
           </div>
         </div>
         
         <div className="text-right">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-400">
             {getMemberCount()} member{getMemberCount() !== 1 ? 's' : ''}
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             Created {formatDate(channel.created)}
           </p>
         </div>
       </div>
       
       {channel.topic && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-sm text-gray-600 line-clamp-2">
+        <div className="mt-3 pt-3 border-t border-gray-700">
+          <p className="text-sm text-gray-300 line-clamp-2">
             {channel.topic}
           </p>
         </div>
       )}
       
-      <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
         <span>ID: {channel.id}</span>
         {channel.is_general && (
-          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+          <span className="bg-blue-900 text-blue-200 px-2 py-1 rounded-full">
             General
           </span>
         )}

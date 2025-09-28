@@ -37,19 +37,19 @@ export function UserCard({ user }: UserCardProps) {
     }
     
     return (
-      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-        <UserIcon className="w-6 h-6 text-gray-500" />
+      <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center">
+        <UserIcon className="w-6 h-6 text-gray-300" />
       </div>
     )
   }
   
   const getUserStatus = () => {
-    if (user.deleted) return { text: 'Deleted', color: 'bg-red-100 text-red-800' }
-    if (user.is_bot) return { text: 'Bot', color: 'bg-blue-100 text-blue-800' }
-    if (user.is_admin) return { text: 'Admin', color: 'bg-purple-100 text-purple-800' }
-    if (user.is_owner) return { text: 'Owner', color: 'bg-yellow-100 text-yellow-800' }
+    if (user.deleted) return { text: 'Deleted', color: 'bg-red-900 text-red-200' }
+    if (user.is_bot) return { text: 'Bot', color: 'bg-blue-900 text-blue-200' }
+    if (user.is_admin) return { text: 'Admin', color: 'bg-purple-900 text-purple-200' }
+    if (user.is_owner) return { text: 'Owner', color: 'bg-yellow-900 text-yellow-200' }
     // if (user.is_primary_owner) return { text: 'Primary Owner', color: 'bg-orange-100 text-orange-800' }
-    return { text: 'Member', color: 'bg-green-100 text-green-800' }
+    return { text: 'Member', color: 'bg-green-900 text-green-200' }
   }
   
   const getStatusIcon = () => {
@@ -62,21 +62,21 @@ export function UserCard({ user }: UserCardProps) {
   const status = getUserStatus()
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 hover:shadow-md hover:bg-gray-750 transition-all">
       <div className="flex items-start space-x-3">
         {/* Profile Picture */}
         <div className="relative">
           {getProfilePicture()}
           {/* Fallback icon (hidden by default) */}
-          <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center hidden">
-            <UserIcon className="w-6 h-6 text-gray-500" />
+          <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center hidden">
+            <UserIcon className="w-6 h-6 text-gray-300" />
           </div>
         </div>
         
         {/* User Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-900 truncate">
+            <h3 className="font-medium text-white truncate">
               {getDisplayName()}
             </h3>
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
@@ -85,15 +85,15 @@ export function UserCard({ user }: UserCardProps) {
             </span>
           </div>
           
-          <p className="text-sm text-gray-500 truncate">
+          <p className="text-sm text-gray-400 truncate">
             @{user.name}
           </p>
           
           {/* Title */}
           {user.title && (
             <div className="mt-2 flex items-center">
-              <BriefcaseIcon className="w-4 h-4 text-gray-400 mr-1" />
-              <p className="text-sm text-gray-600 truncate">
+              <BriefcaseIcon className="w-4 h-4 text-gray-500 mr-1" />
+              <p className="text-sm text-gray-300 truncate">
                 {user.title}
               </p>
             </div>
@@ -102,8 +102,8 @@ export function UserCard({ user }: UserCardProps) {
           {/* Email */}
           {user.email && (
             <div className="mt-1 flex items-center">
-              <EnvelopeIcon className="w-4 h-4 text-gray-400 mr-1" />
-              <p className="text-sm text-gray-600 truncate">
+              <EnvelopeIcon className="w-4 h-4 text-gray-500 mr-1" />
+              <p className="text-sm text-gray-300 truncate">
                 {user.email}
               </p>
             </div>
@@ -112,8 +112,8 @@ export function UserCard({ user }: UserCardProps) {
           {/* Phone */}
           {user.phone && (
             <div className="mt-1 flex items-center">
-              <PhoneIcon className="w-4 h-4 text-gray-400 mr-1" />
-              <p className="text-sm text-gray-600 truncate">
+              <PhoneIcon className="w-4 h-4 text-gray-500 mr-1" />
+              <p className="text-sm text-gray-300 truncate">
                 {user.phone}
               </p>
             </div>

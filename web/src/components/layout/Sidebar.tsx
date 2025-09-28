@@ -22,15 +22,15 @@ export function Sidebar() {
   const { logout, currentUser } = useAuthStore()
 
   return (
-    <div className="bg-white border-r border-gray-200 w-64 min-h-screen">
+    <div className="bg-slack-purple border-r border-gray-700 w-64 min-h-screen">
       <div className="p-6">
         <div className="flex items-center mb-8">
-          <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">SS</span>
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+            <span className="text-slack-purple font-bold text-sm">SS</span>
           </div>
           <div className="ml-3">
-            <h1 className="text-lg font-semibold text-gray-900">Slack-Slurp</h1>
-            <p className="text-xs text-gray-500">Reconnaissance Tool</p>
+            <h1 className="text-lg font-semibold text-white">Slack-Slurp</h1>
+            <p className="text-xs text-gray-300">Reconnaissance Tool</p>
           </div>
         </div>
 
@@ -39,7 +39,7 @@ export function Sidebar() {
             <a
               key={item.name}
               href={item.href}
-              className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 rounded-md hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white transition-colors cursor-pointer"
             >
               <item.icon className="w-5 h-5 mr-3" />
               {item.name}
@@ -48,18 +48,18 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="bottom-0 left-0 right-0 p-6 border-t border-gray-200">
+      <div className="bottom-0 left-0 right-0 p-6 border-t border-gray-700">
         {currentUser && (
           <div className="mb-4">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-slack-blue rounded-full flex items-center justify-center">
                 <span className="text-white font-medium text-xs">
                   {currentUser.user?.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">{currentUser.user}</p>
-                <p className="text-xs text-gray-500">{currentUser.team}</p>
+                <p className="text-sm font-medium text-white">{currentUser.user}</p>
+                <p className="text-xs text-gray-300">{currentUser.team}</p>
               </div>
             </div>
           </div>
@@ -67,7 +67,7 @@ export function Sidebar() {
         
         <button
           onClick={logout}
-          className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-500 rounded-md hover:bg-gray-100 hover:text-red-600 transition-colors"
+          className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-red-400 transition-colors cursor-pointer"
         >
           <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
           Sign Out
