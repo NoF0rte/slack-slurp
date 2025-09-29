@@ -89,8 +89,24 @@ export interface SecretResult {
   risk_level: 'low' | 'medium' | 'high' | 'critical'
 }
 
+export interface DomainSearchRequest {
+  domains: string[]
+}
+
+export interface DomainResult {
+  domain: string
+}
+
+export interface DomainSearchResponse {
+  search_id: string
+  status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
+  total_found?: number
+  domains_searched?: string[]
+}
+
 export interface WSMessage {
-  type: 'progress' | 'result' | 'error' | 'complete' | 'connected'
+  type: 'progress' | 'result' | 'error' | 'complete' | 'connected' | 'domain_result' | 'domain_progress'
   data: any
   scan_id?: string
+  search_id?: string
 }

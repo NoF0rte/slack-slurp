@@ -19,8 +19,7 @@ export function downloadJSON(options: ExportOptions): void {
     export_info: {
       timestamp,
       exported_at: new Date(timestamp * 1000).toISOString(),
-      count: data.length,
-      type: filename.includes('users') ? 'users' : 'channels'
+      count: data.length
     },
     data
   }
@@ -49,7 +48,7 @@ export function downloadJSON(options: ExportOptions): void {
 /**
  * Generates filename with timestamp
  */
-export function generateFilename(type: 'users' | 'channels', timestamp: number): string {
+export function generateFilename(type: 'users' | 'channels' | 'domains', timestamp: number): string {
   return `slurp-${type}-${timestamp}.json`
 }
 

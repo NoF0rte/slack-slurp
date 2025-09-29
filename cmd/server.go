@@ -7,6 +7,7 @@ import (
 
 	"github.com/NoF0rte/slack-slurp/internal/api"
 	"github.com/NoF0rte/slack-slurp/internal/static"
+	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 )
@@ -23,11 +24,15 @@ This provides a web interface for all slack-slurp functionality.`,
 		// Set Gin mode
 		// gin.SetMode(gin.ReleaseMode)
 
+		// Create WebSocket hub
+		hub := websocket.NewHub()
+		go hub.Run()
+
 		// Create Gin router
 		router := gin.Default()
 
 		// Setup API routes
-		api.SetupRoutes(router, slurper, &config)
+		api.SetupRoutes(router, slurper, &config, hub)
 
 		// Serve static files from embedded FS
 		router.StaticFileFS("/", "/", http.FS(static.FS)) // Must be / that we query from the embedded FS, otherwise Gin will go into a redirect loop

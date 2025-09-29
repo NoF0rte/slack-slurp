@@ -1,19 +1,21 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 )
 
 // APIHandler handles HTTP requests for the API
 type APIHandler struct {
 	slurper slurp.Slurper
 	config  *slurp.Config
+	hub     *websocket.Hub
 }
 
 // Request/Response types
@@ -33,10 +35,26 @@ type SearchRequest struct {
 	FileTypes []string  `json:"file_types,omitempty"`
 }
 
+type DomainSearchRequest struct {
+	Domains []string `json:"domains"`
+}
+
+type DomainResult struct {
+	Domain string `json:"domain"`
+}
+
+type DomainSearchResponse struct {
+	SearchID        string   `json:"search_id"`
+	Status          string   `json:"status"`
+	TotalFound      int      `json:"total_found,omitempty"`
+	DomainsSearched []string `json:"domains_searched,omitempty"`
+}
+
 type WSMessage struct {
-	Type   string      `json:"type"` // "progress", "result", "error", "complete"
-	Data   interface{} `json:"data"`
-	ScanID string      `json:"scan_id,omitempty"`
+	Type     string      `json:"type"` // "progress", "result", "error", "complete", "domain_result", "domain_progress"
+	Data     interface{} `json:"data"`
+	ScanID   string      `json:"scan_id,omitempty"`
+	SearchID string      `json:"search_id,omitempty"`
 }
 
 // Authentication endpoints
@@ -100,20 +118,16 @@ func (h *APIHandler) WhoAmI(c *gin.Context) {
 }
 
 func (h *APIHandler) GetChannels(c *gin.Context) {
-	channelTypes := c.QueryArray("type")
-	var types []slurp.ChannelType
+	t := slurp.ChannelType(c.Query("type"))
+	types := []slurp.ChannelType{t}
 
-	if len(channelTypes) == 0 {
+	if t == "" {
 		// Default to all types
 		types = []slurp.ChannelType{
 			slurp.ChannelPublic,
 			slurp.ChannelPrivate,
 			slurp.ChannelDirectMessage,
 			slurp.ChannelGroupMessage,
-		}
-	} else {
-		for _, t := range channelTypes {
-			types = append(types, slurp.ChannelType(t))
 		}
 	}
 
@@ -136,16 +150,39 @@ func (h *APIHandler) GetUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
-func (h *APIHandler) GetDomains(c *gin.Context) {
-	domains := c.QueryArray("domain")
-
-	resultDomains, err := h.slurper.GetDomains(domains...)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+func (h *APIHandler) SearchDomains(c *gin.Context) {
+	var req DomainSearchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, resultDomains)
+	if len(req.Domains) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No domains provided"})
+		return
+	}
+
+	searchID := generateSearchID()
+
+	// Start async domain search
+	go h.runDomainSearch(searchID, req.Domains)
+
+	c.JSON(http.StatusOK, DomainSearchResponse{
+		SearchID:        searchID,
+		Status:          "started",
+		DomainsSearched: req.Domains,
+	})
+}
+
+func (h *APIHandler) StopDomainSearch(c *gin.Context) {
+	searchID := c.Param("id")
+
+	// TODO: Implement domain search cancellation
+	// For now, just return success
+	c.JSON(http.StatusOK, gin.H{
+		"search_id": searchID,
+		"status":    "cancelled",
+	})
 }
 
 // Search endpoints
@@ -296,98 +333,8 @@ func (h *APIHandler) DownloadFile(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "File download not implemented"})
 }
 
-// WebSocket endpoints
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for development
-	},
-}
-
-func (h *APIHandler) HandleScanWebSocket(c *gin.Context) {
-	scanID := c.Param("id")
-
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	defer conn.Close()
-
-	// TODO: Implement WebSocket communication for scan updates
-	// For now, just send a test message
-	message := WSMessage{
-		Type:   "connected",
-		Data:   map[string]string{"scan_id": scanID},
-		ScanID: scanID,
-	}
-
-	if err := conn.WriteJSON(message); err != nil {
-		return
-	}
-
-	// Keep connection alive
-	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-	}
-}
-
-func (h *APIHandler) HandleSearchWebSocket(c *gin.Context) {
-	searchID := c.Param("id")
-
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	defer conn.Close()
-
-	// TODO: Implement WebSocket communication for search updates
-	message := WSMessage{
-		Type: "connected",
-		Data: map[string]string{"search_id": searchID},
-	}
-
-	if err := conn.WriteJSON(message); err != nil {
-		return
-	}
-
-	// Keep connection alive
-	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-	}
-}
-
-func (h *APIHandler) HandleDashboardWebSocket(c *gin.Context) {
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	defer conn.Close()
-
-	// TODO: Implement WebSocket communication for dashboard updates
-	message := WSMessage{
-		Type: "connected",
-		Data: map[string]string{"dashboard": "connected"},
-	}
-
-	if err := conn.WriteJSON(message); err != nil {
-		return
-	}
-
-	// Keep connection alive
-	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-	}
+func (h *APIHandler) HandleWebSocket(c *gin.Context) {
+	websocket.ServeWS(h.hub, c.Writer, c.Request, "dashboard", "dashboard")
 }
 
 // Helper functions
@@ -395,7 +342,76 @@ func generateScanID() string {
 	return fmt.Sprintf("scan_%d", time.Now().Unix())
 }
 
+func generateSearchID() string {
+	return fmt.Sprintf("search_%d", time.Now().Unix())
+}
+
 func (h *APIHandler) runSecretScan(scanID string, req SecretScanRequest) {
 	// TODO: Implement actual secret scanning with WebSocket updates
 	// This is a placeholder for the async secret scanning logic
+}
+
+func (h *APIHandler) runDomainSearch(searchID string, domains []string) {
+	// // Send initial progress message
+	// h.sendWebSocketMessage(WSMessage{
+	// 	Type:     "domain_progress",
+	// 	SearchID: searchID,
+	// 	Data:     nil,
+	// })
+
+	totalFound := 0
+
+	domainChan, errorChan := h.slurper.GetDomainsAsync(domains...)
+
+	var err error
+
+Loop:
+	for {
+		select {
+		case domain, ok := <-domainChan:
+			if !ok {
+				break Loop
+			}
+			totalFound++
+
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "domain_result",
+				SearchID: searchID,
+				Data: DomainResult{
+					Domain: domain,
+				},
+			})
+		case err = <-errorChan:
+			close(domainChan)
+		}
+	}
+	close(errorChan)
+
+	if err != nil {
+		h.sendWebSocketMessage(WSMessage{
+			Type:     "error",
+			SearchID: searchID,
+			Data:     map[string]string{"message": "Search error: " + err.Error()},
+		})
+
+		return
+	}
+
+	// Send completion message
+	h.sendWebSocketMessage(WSMessage{
+		Type:     "complete",
+		SearchID: searchID,
+		Data: map[string]interface{}{
+			"total_found":      totalFound,
+			"domains_searched": domains,
+		},
+	})
+}
+
+func (h *APIHandler) sendWebSocketMessage(message WSMessage) {
+	data, err := json.Marshal(message)
+	if err != nil {
+		return
+	}
+	h.hub.BroadcastToType("dashboard", data)
 }

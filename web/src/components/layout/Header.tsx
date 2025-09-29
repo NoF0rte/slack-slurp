@@ -11,6 +11,7 @@ export function Header() {
         dashboard: 'Dashboard',
         channels: 'Channels',
         users: 'Users',
+        domains: 'Domains',
         search: 'Search',
         secrets: 'Secret Scanner',
         settings: 'Settings'
