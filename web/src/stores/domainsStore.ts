@@ -7,6 +7,7 @@ interface DomainsState {
   results: DomainResult[]
   isLoading: boolean
   isSearching: boolean
+  dismissComplete: boolean
   error: string | null
   currentSearch: DomainSearchResponse | null
   
@@ -15,6 +16,7 @@ interface DomainsState {
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
+  setDismissComplete: (value: boolean) => void
 }
 
 export const useDomainsStore = create<DomainsState>((set, get) => ({
@@ -23,6 +25,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
   isSearching: false,
   error: null,
   currentSearch: null,
+  dismissComplete: false,
   progress: {
     domainsProcessed: 0,
     totalDomains: 0,
@@ -123,5 +126,9 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       isLoading: false,
       currentSearch: null
     })
-  }
+  },
+
+  setDismissComplete: (value: boolean) => {
+    set({ dismissComplete: value })
+  },
 }))

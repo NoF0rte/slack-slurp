@@ -17,12 +17,14 @@ export function DomainsPage() {
     results, 
     isLoading, 
     isSearching, 
+    dismissComplete,
     error, 
     currentSearch, 
     searchDomains, 
     clearResults, 
     clearError, 
-    stopSearch 
+    stopSearch,
+    setDismissComplete
   } = useDomainsStore()
   
   const [domainsInput, setDomainsInput] = useState('')
@@ -38,6 +40,8 @@ export function DomainsPage() {
       return
     }
     
+    // Reset dismiss state for new search
+    setDismissComplete(false)
     await searchDomains(domains)
   }
 
@@ -49,9 +53,10 @@ export function DomainsPage() {
     const timestamp = getCurrentTimestamp()
     const filename = generateFilename('domains', timestamp)
     
+    const domains: string[] = results.map(x => x.domain)
     downloadJSON({
       filename,
-      data: results,
+      data: domains,
       timestamp
     })
   }
@@ -63,10 +68,6 @@ export function DomainsPage() {
       result.domain.toLowerCase().includes(query)
     )
   })
-
-  const getUniqueDomains = () => {
-    return [...new Set(results.map(r => r.domain))].length
-  }
 
   return (
     <div className="space-y-6">
@@ -98,73 +99,6 @@ export function DomainsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      {results.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-            <div className="flex items-center">
-              <GlobeAltIcon className="w-8 h-8 text-blue-400" />
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-400">Total Mentions</p>
-                <p className="text-2xl font-bold text-white">{results.length}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-            <div className="flex items-center">
-              <GlobeAltIcon className="w-8 h-8 text-green-400" />
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-400">Unique Domains</p>
-                <p className="text-2xl font-bold text-white">{getUniqueDomains()}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search Form */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Domains to Search (one per line)
-            </label>
-            <textarea
-              value={domainsInput}
-              onChange={(e) => setDomainsInput(e.target.value)}
-              placeholder="example.com&#10;google.com&#10;github.com"
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 h-32 resize-none"
-              disabled={isSearching}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Enter domains to search for in Slack messages. One domain per line.
-            </p>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {!isSearching ? (
-              <button
-                onClick={handleSearch}
-                disabled={isLoading || !domainsInput.trim()}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <PlayIcon className="w-4 h-4" />
-                <span>Start Search</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleStop}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 cursor-pointer"
-              >
-                <StopIcon className="w-4 h-4" />
-                <span>Stop Search</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Search Status Banner */}
       {isSearching && (
         <div className="bg-blue-900 border border-blue-700 rounded-lg p-6">
@@ -192,7 +126,7 @@ export function DomainsPage() {
       )}
 
       {/* Search Complete Banner */}
-      {!isSearching && !isLoading && results.length > 0 && currentSearch?.status === 'completed' && (
+      {!isSearching && !isLoading && results.length > 0 && currentSearch?.status === 'completed' && !dismissComplete && (
         <div className="bg-green-900 border border-green-700 rounded-lg p-6">
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
@@ -206,9 +140,67 @@ export function DomainsPage() {
                 Found {results.length} domain{results.length !== 1 ? 's' : ''} in Slack messages.
               </p>
             </div>
+            <div className="flex-shrink-0">
+              <button
+                onClick={() => setDismissComplete(true)}
+                className="text-green-300 hover:text-green-100 cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Stats Cards */}
+      {results.length > 0 && (
+        <div className="flex justify-start">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 inline-block">
+            <div className="flex items-center">
+              <GlobeAltIcon className="w-8 h-8 text-green-400" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-400">Unique Domains</p>
+                <p className="text-2xl font-bold text-white">{results.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search Form */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Domains to Search (one per line)
+            </label>
+            <textarea
+              value={domainsInput}
+              onChange={(e) => setDomainsInput(e.target.value)}
+              placeholder="example.com&#10;google.com&#10;github.com"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 h-32 resize-none"
+              disabled={isSearching}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Enter domains to search for in Slack messages. One domain per line.
+            </p>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleSearch}
+              disabled={isLoading || isSearching || !domainsInput.trim()}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <PlayIcon className="w-4 h-4" />
+              <span>Start Search</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
 
       {/* Error State */}
       {error && (
