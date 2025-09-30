@@ -56,14 +56,8 @@ export class WebSocketManager {
       case 'domain_result':
         this.emit('domain_result', message.data)
         break
-      case 'domain_progress':
-        this.emit('domain_progress', message.data)
-        break
-      case 'progress':
-        this.emit('progress', message.data)
-        break
-      case 'result':
-        this.emit('result', message.data)
+      case 'url_result':
+        this.emit('url_result', message.data)
         break
       case 'error':
         this.emit('error', message.data)

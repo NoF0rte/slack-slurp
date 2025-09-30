@@ -5,6 +5,7 @@ import {
   ChatBubbleLeftRightIcon,
   UsersIcon,
   GlobeAltIcon,
+  LinkIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
@@ -15,6 +16,7 @@ const navigation = [
   { name: 'Channels', href: '#channels', icon: ChatBubbleLeftRightIcon },
   { name: 'Users', href: '#users', icon: UsersIcon },
   { name: 'Domains', href: '#domains', icon: GlobeAltIcon },
+  { name: 'URLs', href: '#urls', icon: LinkIcon },
   { name: 'Search', href: '#search', icon: MagnifyingGlassIcon },
   { name: 'Secret Scanner', href: '#secrets', icon: ShieldCheckIcon },
   { name: 'Settings', href: '#settings', icon: Cog6ToothIcon },

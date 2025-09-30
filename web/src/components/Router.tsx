@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { ChannelsPage } from './channels/ChannelsPage'
 import { UsersPage } from './users/UsersPage'
 import { DomainsPage } from './domains/DomainsPage'
+import { URLsPage } from './urls/URLsPage'
 
-type Route = 'dashboard' | 'channels' | 'users' | 'domains' | 'search' | 'secrets' | 'settings'
+type Route = 'dashboard' | 'channels' | 'users' | 'domains' | 'urls' | 'search' | 'secrets' | 'settings'
 
 export function Router() {
   const [currentRoute, setCurrentRoute] = useState<Route>('dashboard')
@@ -12,7 +13,7 @@ export function Router() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1) as Route
-      if (hash && ['dashboard', 'channels', 'users', 'domains', 'search', 'secrets', 'settings'].includes(hash)) {
+      if (hash && ['dashboard', 'channels', 'users', 'domains', 'urls', 'search', 'secrets', 'settings'].includes(hash)) {
         setCurrentRoute(hash)
       } else {
         setCurrentRoute('dashboard')
@@ -32,6 +33,8 @@ export function Router() {
         return <UsersPage />
       case 'domains':
         return <DomainsPage />
+      case 'urls':
+        return <URLsPage />
       case 'search':
         return <div className="p-6"><h1 className="text-2xl font-bold text-white">Search</h1><p className="text-gray-400">Search page coming soon...</p></div>
       case 'secrets':
@@ -63,6 +66,11 @@ export function Router() {
                 <h2 className="text-lg font-semibold text-white mb-2">Domains</h2>
                 <p className="text-gray-400 mb-4">Search Slack for mentions of specific domains</p>
                 <a href="#domains" className="text-blue-400 hover:text-blue-300 font-medium cursor-pointer">Search Domains →</a>
+              </div>
+              <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 hover:bg-gray-750 transition-colors">
+                <h2 className="text-lg font-semibold text-white mb-2">URLs</h2>
+                <p className="text-gray-400 mb-4">Search Slack for URLs in messages</p>
+                <a href="#urls" className="text-blue-400 hover:text-blue-300 font-medium cursor-pointer">Search URLs →</a>
               </div>
               <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 hover:bg-gray-750 transition-colors">
                 <h2 className="text-lg font-semibold text-white mb-2">Search</h2>

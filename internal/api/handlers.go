@@ -51,7 +51,7 @@ type DomainSearchResponse struct {
 }
 
 type WSMessage struct {
-	Type     string      `json:"type"` // "progress", "result", "error", "complete", "domain_result", "domain_progress"
+	Type     string      `json:"type"` // "connected", "error", "complete", "domain_result", "url_result"
 	Data     interface{} `json:"data"`
 	ScanID   string      `json:"scan_id,omitempty"`
 	SearchID string      `json:"search_id,omitempty"`
@@ -182,6 +182,60 @@ func (h *APIHandler) StopDomainSearch(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"search_id": searchID,
 		"status":    "cancelled",
+	})
+}
+
+func (h *APIHandler) SearchURLs(c *gin.Context) {
+	var options struct {
+		Channels []string `json:"channels"`
+		Users    []string `json:"users"`
+		Before   string   `json:"before"`
+		After    string   `json:"after"`
+	}
+
+	if err := c.ShouldBindJSON(&options); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var searchOptions []slurp.SearchOption
+
+	if len(options.Channels) != 0 {
+		searchOptions = append(searchOptions, slurp.SearchInChannels(options.Channels...))
+	}
+
+	if len(options.Users) != 0 {
+		searchOptions = append(searchOptions, slurp.SearchFromUsers(options.Users...))
+	}
+
+	if options.Before != "" {
+		beforeTime, err := time.Parse("2006-01-02", options.Before)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing 'before' date"})
+			return
+		}
+
+		searchOptions = append(searchOptions, slurp.SearchBefore(beforeTime))
+	}
+
+	if options.After != "" {
+		afterTime, err := time.Parse("2006-01-02", options.After)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing 'after' date"})
+			return
+		}
+
+		searchOptions = append(searchOptions, slurp.SearchAfter(afterTime))
+	}
+
+	searchID := generateSearchID()
+
+	// Start async url search
+	go h.runURLSearch(searchID, searchOptions)
+
+	c.JSON(http.StatusOK, gin.H{
+		"search_id": searchID,
+		"status":    "started",
 	})
 }
 
@@ -352,13 +406,6 @@ func (h *APIHandler) runSecretScan(scanID string, req SecretScanRequest) {
 }
 
 func (h *APIHandler) runDomainSearch(searchID string, domains []string) {
-	// // Send initial progress message
-	// h.sendWebSocketMessage(WSMessage{
-	// 	Type:     "domain_progress",
-	// 	SearchID: searchID,
-	// 	Data:     nil,
-	// })
-
 	totalFound := 0
 
 	domainChan, errorChan := h.slurper.GetDomainsAsync(domains...)
@@ -404,6 +451,53 @@ Loop:
 		Data: map[string]interface{}{
 			"total_found":      totalFound,
 			"domains_searched": domains,
+		},
+	})
+}
+
+func (h *APIHandler) runURLSearch(searchID string, options []slurp.SearchOption) {
+	urlChan, errorChan := h.slurper.GetURLsAsync(options...)
+
+	totalFound := 0
+
+	var err error
+
+Loop:
+	for {
+		select {
+		case u, ok := <-urlChan:
+			if !ok {
+				break Loop
+			}
+			totalFound++
+
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "url_result",
+				SearchID: searchID,
+				Data:     u,
+			})
+		case err = <-errorChan:
+			close(urlChan)
+		}
+	}
+	close(errorChan)
+
+	if err != nil {
+		h.sendWebSocketMessage(WSMessage{
+			Type:     "error",
+			SearchID: searchID,
+			Data:     map[string]string{"message": "Search error: " + err.Error()},
+		})
+
+		return
+	}
+
+	// Send completion message
+	h.sendWebSocketMessage(WSMessage{
+		Type:     "complete",
+		SearchID: searchID,
+		Data: map[string]interface{}{
+			"total_found": totalFound,
 		},
 	})
 }

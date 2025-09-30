@@ -30,6 +30,7 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		api.GET("/users", handler.GetUsers)
 		api.POST("/domains/search", handler.SearchDomains)
 		api.POST("/domains/stop/:id", handler.StopDomainSearch)
+		api.POST("/urls/search", handler.SearchURLs)
 
 		// Search Operations
 		api.POST("/search/messages", handler.SearchMessages)

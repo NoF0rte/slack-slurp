@@ -1,3 +1,7 @@
+setup::
+	go mod download
+	cd web && npm install
+
 assets::
 	cd web && npm run build
 

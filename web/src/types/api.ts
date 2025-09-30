@@ -104,8 +104,21 @@ export interface DomainSearchResponse {
   domains_searched?: string[]
 }
 
+export interface URLSearchRequest {
+  channels?: string[]
+  users?: string[]
+  before?: string
+  after?: string
+}
+
+export interface URLSearchResponse {
+  search_id: string
+  status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
+  total_found?: number
+}
+
 export interface WSMessage {
-  type: 'progress' | 'result' | 'error' | 'complete' | 'connected' | 'domain_result' | 'domain_progress'
+  type: 'error' | 'complete' | 'connected' | 'domain_result' | 'url_result'
   data: any
   scan_id?: string
   search_id?: string
