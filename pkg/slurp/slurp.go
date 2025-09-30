@@ -754,7 +754,7 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 		domainSet := treeset.NewWithStringComparator()
 		for _, domain := range selectedDomains {
 			var err error
-			regex := regexp.MustCompile(fmt.Sprintf(`([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
+			regex := regexp.MustCompile(fmt.Sprintf(`%%?([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
 			messageChan, err2Chan := s.SearchMessagesAsync(domain)
 
 		Loop:
@@ -767,6 +767,22 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 					matches := regex.FindAllString(message.Text, -1)
 
 					for _, match := range matches {
+						// This is so that for the off chance that the match is found in an URL
+						// we will take out the URL encoded character and only match the domain
+						// This isn't perfect because something like %AFexample.com where the domain is actually
+						// AFexample.com will only match example.com
+						if strings.HasPrefix(match, "%") {
+							decoded, err := url.QueryUnescape(match)
+							if err == nil {
+								m := regex.FindString(decoded)
+								if m != "" {
+									match = m
+								}
+							}
+
+							match = strings.TrimPrefix(match, "%")
+						}
+
 						if domainSet.Contains(match) {
 							continue
 						}
