@@ -356,6 +356,7 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 			defer wg.Done()
 			params := slack.NewSearchParameters()
 			params.Page = startingPage
+			params.Count = 100 // Ensure we get the most results to reduce rate limiting
 
 			for {
 				search, err := s.searchMessages(query, params)
