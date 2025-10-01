@@ -35,10 +35,6 @@ type SearchRequest struct {
 	FileTypes []string  `json:"file_types,omitempty"`
 }
 
-type DomainSearchRequest struct {
-	Domains []string `json:"domains"`
-}
-
 type DomainResult struct {
 	Domain string `json:"domain"`
 }
@@ -151,7 +147,9 @@ func (h *APIHandler) GetUsers(c *gin.Context) {
 }
 
 func (h *APIHandler) SearchDomains(c *gin.Context) {
-	var req DomainSearchRequest
+	var req struct {
+		Domains []string `json:"domains"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

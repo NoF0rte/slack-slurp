@@ -3,6 +3,7 @@ import { useURLsStore } from '../../stores/urlsStore'
 import { useChannelsStore } from '../../stores/channelsStore'
 import { useUsersStore } from '../../stores/usersStore'
 import { URLCard } from './URLCard'
+import { MultiSelectDropdown } from '../ui/MultiSelectDropdown'
 import { downloadJSON, generateFilename, getCurrentTimestamp } from '../../utils/export'
 import { 
   MagnifyingGlassIcon, 
@@ -11,7 +12,7 @@ import {
   ArrowDownTrayIcon,
   PlayIcon,
   StopIcon,
-  LinkIcon,
+  LinkIcon
 } from '@heroicons/react/24/outline'
 
 export function URLsPage() {
@@ -37,8 +38,6 @@ export function URLsPage() {
   const [beforeDate, setBeforeDate] = useState('')
   const [afterDate, setAfterDate] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [channelSearchQuery, setChannelSearchQuery] = useState('')
-  const [userSearchQuery, setUserSearchQuery] = useState('')
 
   // Load channels and users on component mount
   useEffect(() => {
@@ -90,43 +89,22 @@ export function URLsPage() {
     )
   })
 
-  const filteredChannels = channels.filter(channel => {
-    const isNotDM = !channel.is_im && !channel.is_mpim
-    if (!isNotDM) return false
-    
-    if (!channelSearchQuery) return true
-    const query = channelSearchQuery.toLowerCase()
-    return channel.name?.toLowerCase().includes(query) || channel.topic?.toLowerCase().includes(query)
-  })
+  // Prepare options for dropdowns
+  const channelOptions = channels
+  .filter(channel => !channel.is_im && !channel.is_mpim)
+  .map(channel => ({
+    id: channel.name,
+    label: channel.name,
+    subtitle: `${channel.num_members} members`
+  }))
 
-  const filteredUsers = users.filter(user => {
-    const isValidUser = !user.is_bot && user.real_name != "Deactivated User"
-    if (!isValidUser) return false
-    
-    if (!userSearchQuery) return true
-    const query = userSearchQuery.toLowerCase()
-    return (
-      user.real_name?.toLowerCase().includes(query) ||
-      user.email?.toLowerCase().includes(query) ||
-      user.name?.toLowerCase().includes(query)
-    )
-  })
-
-  const toggleChannel = (channelId: string) => {
-    setSelectedChannels(prev => 
-      prev.includes(channelId) 
-        ? prev.filter(id => id !== channelId)
-        : [...prev, channelId]
-    )
-  }
-
-  const toggleUser = (username: string) => {
-    setSelectedUsers(prev => 
-      prev.includes(username) 
-        ? prev.filter(name => name !== username)
-        : [...prev, username]
-    )
-  }
+  const userOptions = users
+  .filter(user => !user.is_bot && user.real_name != "Deactivated User")
+  .map(user => ({
+    id: user.name,
+    label: user.real_name,
+    subtitle: `@${user.name}`
+  }))
 
   return (
     <div className="space-y-6">
@@ -238,42 +216,13 @@ export function URLsPage() {
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Channels to Search (optional)
               </label>
-              
-              {/* Channel Search Bar */}
-              <div className="relative mb-2">
-                <input
-                  type="text"
-                  value={channelSearchQuery}
-                  onChange={(e) => setChannelSearchQuery(e.target.value)}
-                  placeholder="Search channels..."
-                  disabled={isSearching}
-                  className="w-full px-3 py-2 pl-10 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
-                />
-                <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              </div>
-              
-              <div className="max-h-32 overflow-y-auto border border-gray-600 rounded-md bg-gray-700 p-2">
-                {channels.length === 0 ? (
-                  <p className="text-gray-400 text-sm">Loading channels...</p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredChannels.map((channel) => (
-                      <label key={channel.id} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedChannels.includes(channel.name)}
-                          onChange={() => toggleChannel(channel.name)}
-                          disabled={isSearching}
-                          className="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-300">
-                          #{channel.name}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <MultiSelectDropdown
+                options={channelOptions}
+                selectedIds={selectedChannels}
+                onSelectionChange={setSelectedChannels}
+                placeholder="Select channels to search..."
+                disabled={isSearching}
+              />
               <p className="text-xs text-gray-400 mt-1">
                 Select specific channels to search. Leave empty to search all channels.
               </p>
@@ -284,42 +233,13 @@ export function URLsPage() {
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Users DMs to Search (optional)
               </label>
-              
-              {/* User Search Bar */}
-              <div className="relative mb-2">
-                <input
-                  type="text"
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                  placeholder="Search users..."
-                  disabled={isSearching}
-                  className="w-full px-3 py-2 pl-10 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
-                />
-                <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              </div>
-              
-              <div className="max-h-32 overflow-y-auto border border-gray-600 rounded-md bg-gray-700 p-2">
-                {users.length === 0 ? (
-                  <p className="text-gray-400 text-sm">Loading users...</p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredUsers.map((user) => (
-                      <label key={user.name} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user.name)}
-                          onChange={() => toggleUser(user.name)}
-                          disabled={isSearching}
-                          className="rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-300">
-                          {user.real_name} ({user.email})
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <MultiSelectDropdown
+                options={userOptions}
+                selectedIds={selectedUsers}
+                onSelectionChange={setSelectedUsers}
+                placeholder="Select users for DM search..."
+                disabled={isSearching}
+              />
               <p className="text-xs text-gray-400 mt-1">
                 Select users to search their DM conversations. Leave empty to skip DMs.
               </p>
