@@ -92,6 +92,7 @@ export function URLsPage() {
   // Prepare options for dropdowns
   const channelOptions = channels
   .filter(channel => !channel.is_im && !channel.is_mpim)
+  .sort((a, b) => b.num_members - a.num_members)
   .map(channel => ({
     id: channel.name,
     label: channel.name,
