@@ -18,6 +18,45 @@ type APIHandler struct {
 	hub     *websocket.Hub
 }
 
+type SearchFiltersRequest struct {
+	Channels []string `json:"channels"`
+	Users    []string `json:"users"`
+	Before   string   `json:"before"`
+	After    string   `json:"after"`
+}
+
+func (o *SearchFiltersRequest) toSearchOptions() ([]slurp.SearchOption, error) {
+	var searchOptions []slurp.SearchOption
+
+	if len(o.Channels) != 0 {
+		searchOptions = append(searchOptions, slurp.SearchInChannels(o.Channels...))
+	}
+
+	if len(o.Users) != 0 {
+		searchOptions = append(searchOptions, slurp.SearchFromUsers(o.Users...))
+	}
+
+	if o.Before != "" {
+		beforeTime, err := time.Parse("2006-01-02", o.Before)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing 'before' date")
+		}
+
+		searchOptions = append(searchOptions, slurp.SearchBefore(beforeTime))
+	}
+
+	if o.After != "" {
+		afterTime, err := time.Parse("2006-01-02", o.After)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing 'after' date")
+		}
+
+		searchOptions = append(searchOptions, slurp.SearchAfter(afterTime))
+	}
+
+	return searchOptions, nil
+}
+
 // Request/Response types
 type SecretScanRequest struct {
 	Channels     []string `json:"channels"`
@@ -148,6 +187,7 @@ func (h *APIHandler) GetUsers(c *gin.Context) {
 
 func (h *APIHandler) SearchDomains(c *gin.Context) {
 	var req struct {
+		SearchFiltersRequest
 		Domains []string `json:"domains"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -160,10 +200,16 @@ func (h *APIHandler) SearchDomains(c *gin.Context) {
 		return
 	}
 
+	searchOptions, err := req.toSearchOptions()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	searchID := generateSearchID()
 
 	// Start async domain search
-	go h.runDomainSearch(searchID, req.Domains)
+	go h.runDomainSearch(searchID, req.Domains, searchOptions)
 
 	c.JSON(http.StatusOK, DomainSearchResponse{
 		SearchID:        searchID,
@@ -184,46 +230,16 @@ func (h *APIHandler) StopDomainSearch(c *gin.Context) {
 }
 
 func (h *APIHandler) SearchURLs(c *gin.Context) {
-	var options struct {
-		Channels []string `json:"channels"`
-		Users    []string `json:"users"`
-		Before   string   `json:"before"`
-		After    string   `json:"after"`
-	}
-
+	var options SearchFiltersRequest
 	if err := c.ShouldBindJSON(&options); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	var searchOptions []slurp.SearchOption
-
-	if len(options.Channels) != 0 {
-		searchOptions = append(searchOptions, slurp.SearchInChannels(options.Channels...))
-	}
-
-	if len(options.Users) != 0 {
-		searchOptions = append(searchOptions, slurp.SearchFromUsers(options.Users...))
-	}
-
-	if options.Before != "" {
-		beforeTime, err := time.Parse("2006-01-02", options.Before)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing 'before' date"})
-			return
-		}
-
-		searchOptions = append(searchOptions, slurp.SearchBefore(beforeTime))
-	}
-
-	if options.After != "" {
-		afterTime, err := time.Parse("2006-01-02", options.After)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing 'after' date"})
-			return
-		}
-
-		searchOptions = append(searchOptions, slurp.SearchAfter(afterTime))
+	searchOptions, err := options.toSearchOptions()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	searchID := generateSearchID()
@@ -403,10 +419,10 @@ func (h *APIHandler) runSecretScan(scanID string, req SecretScanRequest) {
 	// This is a placeholder for the async secret scanning logic
 }
 
-func (h *APIHandler) runDomainSearch(searchID string, domains []string) {
+func (h *APIHandler) runDomainSearch(searchID string, domains []string, options []slurp.SearchOption) {
 	totalFound := 0
 
-	domainChan, errorChan := h.slurper.GetDomainsAsync(domains...)
+	domainChan, errorChan := h.slurper.GetDomainsAsync(domains, options...)
 
 	var err error
 

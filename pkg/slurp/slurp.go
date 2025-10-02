@@ -718,8 +718,8 @@ func (s Slurper) GetSecretsAsync(opts ...SecretOption) (chan SecretResult, chan 
 }
 
 // GetDomains searches Slack for domains and subdomains. Will return only once all domains have been retrieved.
-func (s Slurper) GetDomains(domains ...string) ([]string, error) {
-	domainChan, errorChan := s.GetDomainsAsync(domains...)
+func (s Slurper) GetDomains(domains []string, options ...SearchOption) ([]string, error) {
+	domainChan, errorChan := s.GetDomainsAsync(domains, options...)
 
 	var err error
 	var allDomains []string
@@ -742,7 +742,7 @@ Loop:
 }
 
 // GetDomainsAsync searches Slack for domains and subdomains asynchronously.
-func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
+func (s Slurper) GetDomainsAsync(domains []string, options ...SearchOption) (chan string, chan error) {
 	domainChan := make(chan string)
 	errorChan := make(chan error)
 
@@ -756,7 +756,7 @@ func (s Slurper) GetDomainsAsync(domains ...string) (chan string, chan error) {
 		for _, domain := range selectedDomains {
 			var err error
 			regex := regexp.MustCompile(fmt.Sprintf(`%%?([0-9a-zA-Z\-\.\*]+)?%s`, regexp.QuoteMeta(domain)))
-			messageChan, err2Chan := s.SearchMessagesAsync(domain)
+			messageChan, err2Chan := s.SearchMessagesAsync(domain, options...)
 
 		Loop:
 			for {

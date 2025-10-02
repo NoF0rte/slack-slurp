@@ -71,7 +71,7 @@ export function SearchOptions({
               disabled={isSearching}
             />
             <p className="text-xs text-gray-400 mt-1">
-              Select specific channels to search. Leave empty to search all channels.
+              Select specific channels to search. Leave empty to search all channels unless a user has been selected.
             </p>
           </div>
 
@@ -88,7 +88,7 @@ export function SearchOptions({
               disabled={isSearching}
             />
             <p className="text-xs text-gray-400 mt-1">
-              Select users to search their DM conversations. Leave empty to skip DMs.
+              Select users to search their DM conversations. Leave empty to search all DMs unless a channel has been selected.
             </p>
           </div>
         </div>

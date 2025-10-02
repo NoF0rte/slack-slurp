@@ -12,7 +12,7 @@ interface DomainsState {
   currentSearch: DomainSearchResponse | null
   
   // Actions
-  searchDomains: (domains: string[]) => Promise<void>
+  searchDomains: (request: DomainSearchRequest) => Promise<void>
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
@@ -32,7 +32,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
     messagesScanned: 0
   },
 
-  searchDomains: async (domains: string[]) => {
+  searchDomains: async (request: DomainSearchRequest) => {
     set({ isLoading: true, error: null, isSearching: true })
     
     try {
@@ -89,7 +89,6 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       wsManager.on('error', handleError)
       
       // Start the search
-      const request: DomainSearchRequest = { domains }
       const response = await api.post('/domains/search', request)
       const searchResponse: DomainSearchResponse = response.data
       

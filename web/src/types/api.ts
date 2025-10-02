@@ -91,6 +91,10 @@ export interface SecretResult {
 
 export interface DomainSearchRequest {
   domains: string[]
+  channels?: string[]
+  users?: string[]
+  before?: string
+  after?: string
 }
 
 export interface DomainResult {

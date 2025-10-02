@@ -44,10 +44,27 @@ export function DomainsPage() {
     if (domains.length === 0) {
       return
     }
+
+    const request: any = {
+      domains
+    }
+
+    if (selectedChannels.length > 0) {
+      request.channels = selectedChannels
+    }
+    if (selectedUsers.length > 0) {
+      request.users = selectedUsers
+    }
+    if (beforeDate) {
+      request.before = beforeDate
+    }
+    if (afterDate) {
+      request.after = afterDate
+    }
     
     // Reset dismiss state for new search
     setDismissComplete(false)
-    await searchDomains(domains)
+    await searchDomains(request)
   }
 
   const handleStop = () => {
