@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDomainsStore } from '../../stores/domainsStore'
 import { DomainCard } from './DomainCard'
+import { SearchOptions } from '../common/SearchOptions'
 import { downloadJSON, generateFilename, getCurrentTimestamp } from '../../utils/export'
 import { 
   MagnifyingGlassIcon, 
@@ -29,6 +30,10 @@ export function DomainsPage() {
   
   const [domainsInput, setDomainsInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [beforeDate, setBeforeDate] = useState('')
+  const [afterDate, setAfterDate] = useState('')
 
   const handleSearch = async () => {
     const domains = domainsInput
@@ -169,7 +174,7 @@ export function DomainsPage() {
         </div>
       )}
 
-      {/* Search Form */}
+      {/* Domains Input Form */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         <div className="space-y-4">
           <div>
@@ -187,18 +192,32 @@ export function DomainsPage() {
               Enter domains to search for in Slack messages. One domain per line.
             </p>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={handleSearch}
-              disabled={isLoading || isSearching || !domainsInput.trim()}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <PlayIcon className="w-4 h-4" />
-              <span>Start Search</span>
-            </button>
-          </div>
         </div>
+      </div>
+
+      {/* Search Options */}
+      <SearchOptions
+        selectedChannels={selectedChannels}
+        selectedUsers={selectedUsers}
+        beforeDate={beforeDate}
+        afterDate={afterDate}
+        isSearching={isSearching}
+        onChannelsChange={setSelectedChannels}
+        onUsersChange={setSelectedUsers}
+        onBeforeDateChange={setBeforeDate}
+        onAfterDateChange={setAfterDate}
+      />
+
+      {/* Search Button */}
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={handleSearch}
+          disabled={isLoading || isSearching || !domainsInput.trim()}
+          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <PlayIcon className="w-4 h-4" />
+          <span>Start Search</span>
+        </button>
       </div>
 
 

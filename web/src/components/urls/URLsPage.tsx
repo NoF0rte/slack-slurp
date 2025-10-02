@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useURLsStore } from '../../stores/urlsStore'
-import { useChannelsStore } from '../../stores/channelsStore'
-import { useUsersStore } from '../../stores/usersStore'
 import { URLCard } from './URLCard'
-import { MultiSelectDropdown } from '../ui/MultiSelectDropdown'
+import { SearchOptions } from '../common/SearchOptions'
 import { downloadJSON, generateFilename, getCurrentTimestamp } from '../../utils/export'
 import { 
   MagnifyingGlassIcon, 
@@ -30,20 +28,11 @@ export function URLsPage() {
     setDismissComplete
   } = useURLsStore()
 
-  const { channels, fetchChannels } = useChannelsStore()
-  const { users, fetchUsers } = useUsersStore()
-
   const [selectedChannels, setSelectedChannels] = useState<string[]>([])
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [beforeDate, setBeforeDate] = useState('')
   const [afterDate, setAfterDate] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-
-  // Load channels and users on component mount
-  useEffect(() => {
-    fetchChannels()
-    fetchUsers()
-  }, [fetchChannels, fetchUsers])
 
   const handleSearch = async () => {
     const request: any = {}
@@ -89,23 +78,6 @@ export function URLsPage() {
     )
   })
 
-  // Prepare options for dropdowns
-  const channelOptions = channels
-  .filter(channel => !channel.is_im && !channel.is_mpim)
-  .sort((a, b) => b.num_members - a.num_members)
-  .map(channel => ({
-    id: channel.name,
-    label: channel.name,
-    subtitle: `${channel.num_members} members`
-  }))
-
-  const userOptions = users
-  .filter(user => !user.is_bot && user.real_name != "Deactivated User")
-  .map(user => ({
-    id: user.name,
-    label: user.real_name,
-    subtitle: `@${user.name}`
-  }))
 
   return (
     <div className="space-y-6">
@@ -207,85 +179,29 @@ export function URLsPage() {
         </div>
       )}
 
-      {/* Search Form */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-        <div className="space-y-4">
-          {/* Channels and Users Selection - Side by Side */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Channels Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Channels to Search (optional)
-              </label>
-              <MultiSelectDropdown
-                options={channelOptions}
-                selectedIds={selectedChannels}
-                onSelectionChange={setSelectedChannels}
-                placeholder="Select channels to search..."
-                disabled={isSearching}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Select specific channels to search. Leave empty to search all channels.
-              </p>
-            </div>
+      {/* Search Options */}
+      <SearchOptions
+        selectedChannels={selectedChannels}
+        selectedUsers={selectedUsers}
+        beforeDate={beforeDate}
+        afterDate={afterDate}
+        isSearching={isSearching}
+        onChannelsChange={setSelectedChannels}
+        onUsersChange={setSelectedUsers}
+        onBeforeDateChange={setBeforeDate}
+        onAfterDateChange={setAfterDate}
+      />
 
-            {/* Users Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Users DMs to Search (optional)
-              </label>
-              <MultiSelectDropdown
-                options={userOptions}
-                selectedIds={selectedUsers}
-                onSelectionChange={setSelectedUsers}
-                placeholder="Select users for DM search..."
-                disabled={isSearching}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Select users to search their DM conversations. Leave empty to skip DMs.
-              </p>
-            </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Search After (optional)
-              </label>
-              <input
-                type="date"
-                value={afterDate}
-                onChange={(e) => setAfterDate(e.target.value)}
-                disabled={isSearching}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Search Before (optional)
-              </label>
-              <input
-                type="date"
-                value={beforeDate}
-                onChange={(e) => setBeforeDate(e.target.value)}
-                disabled={isSearching}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={handleSearch}
-              disabled={isLoading || isSearching}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <PlayIcon className="w-4 h-4" />
-              <span>Start Search</span>
-            </button>
-          </div>
-        </div>
+      {/* Search Button */}
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={handleSearch}
+          disabled={isLoading || isSearching}
+          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <PlayIcon className="w-4 h-4" />
+          <span>Start Search</span>
+        </button>
       </div>
 
       {/* Error State */}
