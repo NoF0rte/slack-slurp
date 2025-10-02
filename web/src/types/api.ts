@@ -22,10 +22,9 @@ export interface Channel {
   is_private: boolean
   is_archived: boolean
   is_general: boolean
+  latest: number
   created: number
-  // creator: string
   num_members: number
-  // members?: string[]
   topic?: string
 }
 

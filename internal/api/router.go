@@ -27,6 +27,7 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		// Core Operations
 		api.GET("/whoami", handler.WhoAmI)
 		api.GET("/channels", handler.GetChannels)
+		api.POST("/channels/stop", handler.StopChannelLoading)
 		api.GET("/users", handler.GetUsers)
 		api.POST("/domains/search", handler.SearchDomains)
 		api.POST("/domains/stop/:id", handler.StopDomainSearch)

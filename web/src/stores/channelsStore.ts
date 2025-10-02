@@ -1,21 +1,25 @@
 import { create } from 'zustand'
 import { Channel } from '../types/api'
 import { api } from '../utils/api'
+import { wsManager } from '../utils/websocket'
 
 interface ChannelsState {
   channels: Channel[]
   isLoading: boolean
+  isAsyncLoading: boolean
   error: string | null
-  fetchChannels: (types?: string[]) => Promise<void>
+  fetchChannels: (withActivity: boolean, types?: string[]) => Promise<void>
   clearError: () => void
+  stopLoading: () => void
 }
 
 export const useChannelsStore = create<ChannelsState>((set) => ({
   channels: [],
   isLoading: false,
+  isAsyncLoading: false,
   error: null,
   
-  fetchChannels: async (types?: string[]) => {
+  fetchChannels: async (withLatest: boolean, types?: string[]) => {
     set({ isLoading: true, error: null })
     
     try {
@@ -23,8 +27,61 @@ export const useChannelsStore = create<ChannelsState>((set) => ({
       if (types && types.length > 0) {
         types.forEach(type => params.append('type', type))
       }
+
+      if (withLatest) {
+        params.append("latest", "true")
+
+        set({ isLoading: false, isAsyncLoading: true, channels: [] })
+
+        // Start WebSocket connection if not already connected
+        if (!wsManager.isConnected()) {
+          await wsManager.connect()
+        }
+        
+        // Set up WebSocket listeners
+        const handleChannelResult = (data: Channel) => {
+          set(state => ({
+            channels: [...state.channels, data]
+          }))
+        }
+        
+        const handleComplete = () => {
+          set({
+            isLoading: false,
+            isAsyncLoading: false,
+          })
+          
+          // Clean up listeners
+          wsManager.off('channel_result', handleChannelResult)
+          wsManager.off('complete', handleComplete)
+          wsManager.off('error', handleError)
+        }
+        
+        const handleError = (data: any) => {
+          set({
+            error: data.message || 'Channel loading failed',
+            isLoading: false,
+            isAsyncLoading: false,
+          })
+          
+          // Clean up listeners
+          wsManager.off('channel_result', handleChannelResult)
+          wsManager.off('complete', handleComplete)
+          wsManager.off('error', handleError)
+        }
+        
+        // Add listeners
+        wsManager.on('channel_result', handleChannelResult)
+        wsManager.on('complete', handleComplete)
+        wsManager.on('error', handleError)
+      }
       
-      const response = await api.get(`/channels?${params.toString()}`)
+      let response = await api.get(`/channels?${params.toString()}`)
+
+      if (withLatest) {
+        return
+      }
+
       set({ 
         channels: response.data, 
         isLoading: false,
@@ -38,5 +95,14 @@ export const useChannelsStore = create<ChannelsState>((set) => ({
     }
   },
   
-  clearError: () => set({ error: null })
+  clearError: () => set({ error: null }),
+
+  stopLoading: () => {
+    api.post(`/channels/stop`).catch(console.error)
+    
+    set({
+      isLoading: false,
+      isAsyncLoading: false,
+    })
+  },
 }))

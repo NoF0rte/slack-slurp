@@ -68,6 +68,7 @@ type Channel struct {
 	IsGroupMessage   bool           `json:"is_mpim"`
 	NumMembers       int            `json:"num_members"`
 	Created          slack.JSONTime `json:"created"`
+	Latest           slack.JSONTime `json:"latest"`
 	ConnectedTeamIDs []string       `json:"connected_team_ids"`
 	SharedTeamIDs    []string       `json:"shared_team_ids"`
 	InternalTeamIDs  []string       `json:"internal_team_ids"`
@@ -879,17 +880,6 @@ func (s Slurper) GetURLsAsync(options ...SearchOption) (chan string, chan error)
 	return urlChan, errorChan
 }
 
-func (s Slurper) getChannelInfo(channelID string) (*slack.Channel, error) {
-	for {
-		channel, err := s.client.GetConversationInfo(&slack.GetConversationInfoInput{ChannelID: channelID})
-		if s.handleRateLimit(err) {
-			continue
-		}
-
-		return channel, err
-	}
-}
-
 func (s Slurper) getUsersInfo(users ...string) (*[]slack.User, error) {
 	for {
 		users, err := s.client.GetUsersInfo(users...)
@@ -898,6 +888,25 @@ func (s Slurper) getUsersInfo(users ...string) (*[]slack.User, error) {
 		}
 
 		return users, err
+	}
+}
+
+func (s Slurper) GetLatestMessage(channelID string) (*slack.Message, error) {
+	for {
+		resp, err := s.client.GetConversationHistory(&slack.GetConversationHistoryParameters{
+			ChannelID: channelID,
+			Limit:     1, // Only want the latest message
+		})
+
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		if len(resp.Messages) == 0 {
+			return nil, nil
+		}
+
+		return &resp.Messages[0], err
 	}
 }
 

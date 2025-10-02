@@ -68,6 +68,9 @@ export function ChannelCard({ channel }: ChannelCardProps) {
           <p className="text-xs text-gray-500">
             Created {formatDate(channel.created)}
           </p>
+          <p className="text-xs text-gray-500">
+            Latest {channel.latest != 0 ? formatDate(channel.latest) : "None"}
+          </p>
         </div>
       </div>
       

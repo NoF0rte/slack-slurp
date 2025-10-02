@@ -8,7 +8,9 @@ import {
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  StopIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline'
 
 type ChannelType = 'all' | 'public' | 'private' | 'direct' | 'group'
@@ -22,14 +24,14 @@ const channelTypeOptions = [
 ]
 
 export function ChannelsPage() {
-  const { channels, isLoading, error, fetchChannels, clearError } = useChannelsStore()
+  const { channels, isLoading, isAsyncLoading, error, fetchChannels, clearError, stopLoading } = useChannelsStore()
   const [selectedType, setSelectedType] = useState<ChannelType>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
-    fetchChannels(types)
+    fetchChannels(true, types)
   }, [selectedType, fetchChannels])
 
   const filteredChannels = channels.filter(channel => {
@@ -43,15 +45,50 @@ export function ChannelsPage() {
 
   const groupedChannels = {
     public: filteredChannels.filter(ch => !ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im)
-      .sort((a, b) => b.num_members - a.num_members),
+      .sort((a, b) => {
+        // Sort by latest activity first (most recent first)
+        if (b.latest !== a.latest) {
+          return b.latest - a.latest
+        }
+        // Then by number of members (most members first)
+        return b.num_members - a.num_members
+      }),
     private: filteredChannels.filter(ch => ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im)
-      .sort((a, b) => b.num_members - a.num_members),
+      .sort((a, b) => {
+        // Sort by latest activity first (most recent first)
+        if (b.latest !== a.latest) {
+          return b.latest - a.latest
+        }
+        // Then by number of members (most members first)
+        return b.num_members - a.num_members
+      }),
     direct: filteredChannels.filter(ch => ch.is_im)
-      .sort((a, b) => b.num_members - a.num_members),
+      .sort((a, b) => {
+        // Sort by latest activity first (most recent first)
+        if (b.latest !== a.latest) {
+          return b.latest - a.latest
+        }
+        // Then by number of members (most members first)
+        return b.num_members - a.num_members
+      }),
     group: filteredChannels.filter(ch => ch.is_mpim)
-      .sort((a, b) => b.num_members - a.num_members),
+      .sort((a, b) => {
+        // Sort by latest activity first (most recent first)
+        if (b.latest !== a.latest) {
+          return b.latest - a.latest
+        }
+        // Then by number of members (most members first)
+        return b.num_members - a.num_members
+      }),
     archived: filteredChannels.filter(ch => ch.is_archived)
-      .sort((a, b) => b.num_members - a.num_members),
+      .sort((a, b) => {
+        // Sort by latest activity first (most recent first)
+        if (b.latest !== a.latest) {
+          return b.latest - a.latest
+        }
+        // Then by number of members (most members first)
+        return b.num_members - a.num_members
+      }),
   }
 
   const getGroupTitle = (group: keyof typeof groupedChannels) => {
@@ -71,7 +108,7 @@ export function ChannelsPage() {
 
   const handleRefresh = () => {
     const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
-    fetchChannels(types)
+    fetchChannels(true, types)
   }
 
   const handleExportChannels = () => {
@@ -104,7 +141,7 @@ export function ChannelsPage() {
         <div className="flex items-center space-x-3">
           <button
             onClick={handleExportChannels}
-            disabled={isLoading || filteredChannels.length === 0}
+            disabled={isLoading || isAsyncLoading || filteredChannels.length === 0}
             className="flex items-center space-x-2 px-4 py-2 bg-slack-blue text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ArrowDownTrayIcon className="w-4 h-4" />
@@ -113,7 +150,7 @@ export function ChannelsPage() {
           
           <button
             onClick={handleRefresh}
-            disabled={isLoading}
+            disabled={isLoading || isAsyncLoading}
             className="flex items-center space-x-2 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm font-medium text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -121,6 +158,38 @@ export function ChannelsPage() {
           </button>
         </div>
       </div>
+
+      {/* Stats Card and Async Loading */}
+      {channels.length > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 inline-block">
+            <div className="flex items-center">
+              <ChatBubbleLeftRightIcon className="w-8 h-8 text-blue-400" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-400">Channels Loaded</p>
+                <p className="text-2xl font-bold text-white">{channels.length}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Async Loading Indicator */}
+          {isAsyncLoading && (
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <ArrowPathIcon className="w-5 h-5 text-blue-400 animate-spin" />
+                <span className="text-blue-400 text-sm">Loading channel information...</span>
+              </div>
+              <button
+                onClick={stopLoading}
+                className="flex items-center space-x-2 px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 cursor-pointer"
+              >
+                <StopIcon className="w-4 h-4" />
+                <span>Stop</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
@@ -182,7 +251,7 @@ export function ChannelsPage() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
+      {isLoading && !isAsyncLoading && (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center space-x-2">
             <ArrowPathIcon className="w-5 h-5 animate-spin text-blue-400" />
@@ -192,7 +261,7 @@ export function ChannelsPage() {
       )}
 
       {/* Channels Grid */}
-      {!isLoading && !error && (
+      {(!isLoading || isAsyncLoading) && !error && (
         <div className="space-y-6">
           {Object.entries(groupedChannels).map(([group, groupChannels]) => {
             if (groupChannels.length === 0) return null

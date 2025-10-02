@@ -1,14 +1,19 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/gin-gonic/gin"
+	"github.com/slack-go/slack"
 )
 
 // APIHandler handles HTTP requests for the API
@@ -16,6 +21,10 @@ type APIHandler struct {
 	slurper slurp.Slurper
 	config  *slurp.Config
 	hub     *websocket.Hub
+	// Context for cancelling channel loading operations
+	channelCtx    context.Context
+	channelCancel context.CancelFunc
+	channelMutex  sync.RWMutex
 }
 
 type SearchFiltersRequest struct {
@@ -156,6 +165,8 @@ func (h *APIHandler) GetChannels(c *gin.Context) {
 	t := slurp.ChannelType(c.Query("type"))
 	types := []slurp.ChannelType{t}
 
+	withLatest := c.Query("latest") == "true"
+
 	if t == "" {
 		// Default to all types
 		types = []slurp.ChannelType{
@@ -172,7 +183,37 @@ func (h *APIHandler) GetChannels(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, channels)
+	if !withLatest {
+		c.JSON(http.StatusOK, channels)
+		return
+	}
+
+	// Cancel any existing channel loading operation
+	h.channelMutex.Lock()
+	if h.channelCancel != nil {
+		h.channelCancel()
+	}
+	// Create new context for this operation
+	h.channelCtx, h.channelCancel = context.WithCancel(context.Background())
+	h.channelMutex.Unlock()
+
+	// Start async channels activity search with concurrent processing
+	go h.runChannelLatest(channels)
+
+	c.JSON(http.StatusOK, gin.H{"status": "started"})
+}
+
+func (h *APIHandler) StopChannelLoading(c *gin.Context) {
+	h.channelMutex.Lock()
+	defer h.channelMutex.Unlock()
+
+	if h.channelCancel != nil {
+		h.channelCancel()
+		h.channelCancel = nil
+		h.channelCtx = nil
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "stopped"})
 }
 
 func (h *APIHandler) GetUsers(c *gin.Context) {
@@ -514,6 +555,115 @@ Loop:
 			"total_found": totalFound,
 		},
 	})
+}
+
+func (h *APIHandler) runChannelLatest(channels []slurp.Channel) {
+	h.channelMutex.RLock()
+	ctx := h.channelCtx
+	h.channelMutex.RUnlock()
+
+	// Use a worker pool with 2 goroutines for concurrent processing
+	const numWorkers = 10
+	channelChan := make(chan slurp.Channel, len(channels))
+	resultChan := make(chan slurp.Channel, len(channels))
+	errorChan := make(chan error, numWorkers)
+
+	var wg sync.WaitGroup
+
+	// Start worker goroutines
+	for range numWorkers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case channel, ok := <-channelChan:
+					if !ok {
+						return
+					}
+
+					// Check if context is cancelled
+					select {
+					case <-ctx.Done():
+						errorChan <- ctx.Err()
+						return
+					default:
+					}
+
+					latest, err := h.slurper.GetLatestMessage(channel.ID)
+					if err != nil {
+						errorChan <- fmt.Errorf("latest message error for channel %s: %w", channel.ID, err)
+						return
+					}
+
+					if latest != nil {
+						timestamp := strings.Split(latest.Timestamp, ".")[0]
+						t, _ := strconv.Atoi(timestamp)
+						channel.Latest = slack.JSONTime(t)
+					}
+
+					resultChan <- channel
+				case <-ctx.Done():
+					errorChan <- ctx.Err()
+					return
+				}
+			}
+		}()
+	}
+
+	// Send channels to workers
+	go func() {
+		defer close(channelChan)
+		for _, channel := range channels {
+			select {
+			case channelChan <- channel:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Wait for workers to complete
+	go func() {
+		wg.Wait()
+		close(resultChan)
+		close(errorChan)
+	}()
+
+	// Process results
+	for {
+		select {
+		case channel, ok := <-resultChan:
+			if !ok {
+				// All results processed
+				h.sendWebSocketMessage(WSMessage{
+					Type: "complete",
+				})
+				return
+			}
+
+			h.sendWebSocketMessage(WSMessage{
+				Type: "channel_result",
+				Data: channel,
+			})
+
+		case err := <-errorChan:
+			if err != nil {
+				h.sendWebSocketMessage(WSMessage{
+					Type: "error",
+					Data: map[string]string{"message": err.Error()},
+				})
+				return
+			}
+
+		case <-ctx.Done():
+			h.sendWebSocketMessage(WSMessage{
+				Type: "error",
+				Data: map[string]string{"message": "Channel loading cancelled"},
+			})
+			return
+		}
+	}
 }
 
 func (h *APIHandler) sendWebSocketMessage(message WSMessage) {

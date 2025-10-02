@@ -24,7 +24,7 @@ export class WebSocketManager {
         this.ws.onmessage = (event) => {
           try {
             const message: WSMessage = JSON.parse(event.data)
-            this.handleMessage(message)
+            this.emit(message.type, message.data)
           } catch (error) {
             console.error('Failed to parse WebSocket message:', error)
           }
@@ -49,28 +49,6 @@ export class WebSocketManager {
         reject(error)
       }
     })
-  }
-
-  private handleMessage(message: WSMessage) {
-    switch (message.type) {
-      case 'domain_result':
-        this.emit('domain_result', message.data)
-        break
-      case 'url_result':
-        this.emit('url_result', message.data)
-        break
-      case 'error':
-        this.emit('error', message.data)
-        break
-      case 'complete':
-        this.emit('complete', message.data)
-        break
-      case 'connected':
-        this.emit('connected', message.data)
-        break
-      default:
-        console.warn('Unknown WebSocket message type:', message.type)
-    }
   }
 
   on(event: string, callback: (data: any) => void) {

@@ -31,7 +31,7 @@ export function SearchOptions({
 
   // Load channels and users on component mount
   useEffect(() => {
-    fetchChannels()
+    fetchChannels(false)
     fetchUsers()
   }, [fetchChannels, fetchUsers])
 
