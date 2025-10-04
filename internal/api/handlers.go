@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -108,13 +110,12 @@ type MessageResult struct {
 }
 
 type FileResult struct {
-	Name     string      `json:"name"`
-	Created  time.Time   `json:"created"`
-	Channels []string    `json:"channels"`
-	URL      string      `json:"url"`
-	Filetype string      `json:"filetype"`
-	User     string      `json:"user"`
-	Raw      interface{} `json:"raw"`
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Created  time.Time `json:"created"`
+	Channels []string  `json:"channels"`
+	Filetype string    `json:"filetype"`
+	User     string    `json:"user"`
 }
 
 type WSMessage struct {
@@ -334,18 +335,42 @@ func (h *APIHandler) Search(c *gin.Context) {
 	searchID := generateSearchID()
 
 	go func() {
+		var err error
 		if req.SearchType == "messages" || req.SearchType == "" {
-			h.runMessageSearch(searchID, req.Query, searchOptions)
+			err = h.runMessageSearch(searchID, req.Query, searchOptions)
+		}
+
+		if err != nil {
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "error",
+				SearchID: searchID,
+				Data:     map[string]string{"message": "Message search error: " + err.Error()},
+			})
+
+			return
 		}
 
 		if req.SearchType == "files" || req.SearchType == "" {
-			h.runFileSearch(searchID, req.Query, searchOptions)
+			err = h.runFileSearch(searchID, req.Query, searchOptions)
 		}
+
+		if err != nil {
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "error",
+				SearchID: searchID,
+				Data:     map[string]string{"message": "File search error: " + err.Error()},
+			})
+			return
+		}
+
+		h.sendWebSocketMessage(WSMessage{
+			Type:     "complete",
+			SearchID: searchID,
+		})
 	}()
 
 	c.JSON(http.StatusOK, SearchResponse{
 		SearchID: searchID,
-		Status:   "started",
 		Query:    req.Query,
 	})
 }
@@ -405,8 +430,18 @@ func (h *APIHandler) CancelScan(c *gin.Context) {
 }
 
 func (h *APIHandler) DownloadFile(c *gin.Context) {
-	// TODO: Implement file download
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "File download not implemented"})
+	fileID := c.Param("id")
+
+	buffer := bytes.NewBuffer(nil)
+	filename, err := h.slurper.DownloadFile(fileID, buffer)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to download file: " + err.Error()})
+		return
+	}
+
+	c.Writer.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+
+	io.Copy(c.Writer, buffer)
 }
 
 func (h *APIHandler) HandleWebSocket(c *gin.Context) {
@@ -638,10 +673,10 @@ func (h *APIHandler) sendWebSocketMessage(message WSMessage) {
 	if err != nil {
 		return
 	}
-	h.hub.BroadcastToType("search", data)
+	h.hub.BroadcastToType("dashboard", data)
 }
 
-func (h *APIHandler) runMessageSearch(searchID string, query string, options []slurp.SearchOption) {
+func (h *APIHandler) runMessageSearch(searchID string, query string, options []slurp.SearchOption) error {
 	messageChan, errorChan := h.slurper.SearchMessagesAsync(query, options...)
 
 	var err error
@@ -672,22 +707,13 @@ Loop:
 	close(errorChan)
 
 	if err != nil {
-		h.sendWebSocketMessage(WSMessage{
-			Type:     "error",
-			SearchID: searchID,
-			Data:     map[string]string{"message": "Message search error: " + err.Error()},
-		})
-		return
+		return err
 	}
 
-	// Send completion message
-	h.sendWebSocketMessage(WSMessage{
-		Type:     "complete",
-		SearchID: searchID,
-	})
+	return nil
 }
 
-func (h *APIHandler) runFileSearch(searchID string, query string, options []slurp.SearchOption) {
+func (h *APIHandler) runFileSearch(searchID string, query string, options []slurp.SearchOption) error {
 	fileChan, errorChan := h.slurper.SearchFilesAsync(query, options...)
 
 	var err error
@@ -704,13 +730,12 @@ Loop:
 				Type:     "file_result",
 				SearchID: searchID,
 				Data: FileResult{
+					ID:       file.Raw.ID,
 					Name:     file.Name,
 					Created:  file.Created,
 					Channels: file.Channels,
-					URL:      file.URL,
 					Filetype: file.Filetype,
 					User:     file.User,
-					Raw:      file.Raw,
 				},
 			})
 		case err = <-errorChan:
@@ -720,17 +745,8 @@ Loop:
 	close(errorChan)
 
 	if err != nil {
-		h.sendWebSocketMessage(WSMessage{
-			Type:     "error",
-			SearchID: searchID,
-			Data:     map[string]string{"message": "File search error: " + err.Error()},
-		})
-		return
+		return err
 	}
 
-	// Send completion message
-	h.sendWebSocketMessage(WSMessage{
-		Type:     "complete",
-		SearchID: searchID,
-	})
+	return nil
 }

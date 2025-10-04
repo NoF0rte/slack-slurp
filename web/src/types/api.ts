@@ -124,9 +124,8 @@ export interface URLSearchResponse {
 
 export interface SearchResponse {
   search_id: string
-  status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
+  status: 'started' | 'completed' | 'failed' | 'cancelled'
   query: string
-  search_type?: 'messages' | 'files' | 'both'
 }
 
 export interface MessageResult {
@@ -138,13 +137,12 @@ export interface MessageResult {
 }
 
 export interface FileResult {
+  id: string
   name: string
   created: string
   channels: string[]
-  url: string
   filetype: string
   user: string
-  raw: any
 }
 
 export interface WSMessage {

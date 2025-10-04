@@ -46,9 +46,9 @@ export function FileCard({ file }: FileCardProps) {
             <h3 className="text-sm font-medium text-white truncate">
               {file.name}
             </h3>
-            {file.url && (
+            {file.id && (
               <a
-                href={file.url}
+                href={`/api/download/${file.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-sm"

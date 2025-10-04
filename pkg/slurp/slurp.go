@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -518,13 +519,24 @@ func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan F
 						url = match.URLPrivate
 					}
 
+					user := match.User
+					users, err2 := s.getUsersInfo(match.User)
+					if err2 == nil && users != nil {
+						u := (*users)[0]
+
+						user = u.Name
+						if u.RealName != "" {
+							user = u.RealName
+						}
+					}
+
 					fileChan <- File{
 						Name:     match.Name,
 						Created:  match.Created.Time(),
 						Channels: channels,
 						URL:      url,
 						Filetype: match.Filetype,
-						User:     match.User,
+						User:     user,
 						Raw:      match,
 					}
 				}
@@ -1032,4 +1044,18 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 	}()
 
 	return channelChan, errorChan
+}
+
+func (s Slurper) DownloadFile(fileID string, w io.Writer) (string, error) {
+	file, _, _, err := s.client.GetFileInfo(fileID, 1, 1)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.client.GetFile(file.URLPrivateDownload, w)
+	if err != nil {
+		return "", err
+	}
+
+	return file.Name, nil
 }

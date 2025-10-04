@@ -43,8 +43,7 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		api.GET("/secrets/results/:id", handler.GetScanResults)
 		api.DELETE("/secrets/:id", handler.CancelScan)
 
-		// Export & Download
-		api.GET("/download/file/:id", handler.DownloadFile)
+		api.GET("/download/:id", handler.DownloadFile)
 	}
 
 	// WebSocket routes
