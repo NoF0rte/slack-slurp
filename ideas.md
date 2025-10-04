@@ -8,3 +8,4 @@
   - When the profile is selected, set that as the current profile in the UI and send a request to the server stating which profile to use
 - Import users/channels just in case?
 - History of domains and searches
+- Add external section and maybe have it display who the external connection is with

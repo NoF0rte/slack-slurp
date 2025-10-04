@@ -75,12 +75,10 @@ type SecretScanRequest struct {
 }
 
 type SearchRequest struct {
-	Query     string    `json:"query"`
-	Channels  []string  `json:"channels"`
-	Users     []string  `json:"users"`
-	Before    time.Time `json:"before,omitempty"`
-	After     time.Time `json:"after,omitempty"`
-	FileTypes []string  `json:"file_types,omitempty"`
+	SearchFiltersRequest
+	Query      string   `json:"query"`
+	FileTypes  []string `json:"file_types,omitempty"`
+	SearchType string   `json:"search_type,omitempty"` // "messages", "files"
 }
 
 type DomainResult struct {
@@ -94,8 +92,33 @@ type DomainSearchResponse struct {
 	DomainsSearched []string `json:"domains_searched,omitempty"`
 }
 
+type SearchResponse struct {
+	SearchID   string `json:"search_id"`
+	Status     string `json:"status"`
+	Query      string `json:"query"`
+	SearchType string `json:"search_type"`
+}
+
+type MessageResult struct {
+	User    string      `json:"user"`
+	Date    time.Time   `json:"date"`
+	Channel string      `json:"channel"`
+	Text    string      `json:"text"`
+	Raw     interface{} `json:"raw"`
+}
+
+type FileResult struct {
+	Name     string      `json:"name"`
+	Created  time.Time   `json:"created"`
+	Channels []string    `json:"channels"`
+	URL      string      `json:"url"`
+	Filetype string      `json:"filetype"`
+	User     string      `json:"user"`
+	Raw      interface{} `json:"raw"`
+}
+
 type WSMessage struct {
-	Type     string      `json:"type"` // "connected", "error", "complete", "domain_result", "url_result"
+	Type     string      `json:"type"` // "connected", "error", "complete", "domain_result", "url_result", "message_result", "file_result"
 	Data     interface{} `json:"data"`
 	ScanID   string      `json:"scan_id,omitempty"`
 	SearchID string      `json:"search_id,omitempty"`
@@ -295,69 +318,36 @@ func (h *APIHandler) SearchURLs(c *gin.Context) {
 }
 
 // Search endpoints
-func (h *APIHandler) SearchMessages(c *gin.Context) {
+func (h *APIHandler) Search(c *gin.Context) {
 	var req SearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Build search options
-	var options []slurp.SearchOption
-	if len(req.Channels) > 0 {
-		options = append(options, slurp.SearchInChannels(req.Channels...))
-	}
-	if len(req.Users) > 0 {
-		options = append(options, slurp.SearchFromUsers(req.Users...))
-	}
-	if !req.Before.IsZero() {
-		options = append(options, slurp.SearchBefore(req.Before))
-	}
-	if !req.After.IsZero() {
-		options = append(options, slurp.SearchAfter(req.After))
-	}
-
-	messages, err := h.slurper.SearchMessages(req.Query, options...)
+	searchOptions, err := req.toSearchOptions()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, messages)
-}
-
-func (h *APIHandler) SearchFiles(c *gin.Context) {
-	var req SearchRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Build search options
-	var options []slurp.SearchOption
-	if len(req.Channels) > 0 {
-		options = append(options, slurp.SearchInChannels(req.Channels...))
-	}
-	if len(req.Users) > 0 {
-		options = append(options, slurp.SearchFromUsers(req.Users...))
-	}
-	if !req.Before.IsZero() {
-		options = append(options, slurp.SearchBefore(req.Before))
-	}
-	if !req.After.IsZero() {
-		options = append(options, slurp.SearchAfter(req.After))
-	}
-	if len(req.FileTypes) > 0 {
-		options = append(options, slurp.SearchFileTypes(req.FileTypes...))
-	}
+	searchID := generateSearchID()
 
-	files, err := h.slurper.SearchFiles(req.Query, options...)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	go func() {
+		if req.SearchType == "messages" || req.SearchType == "" {
+			h.runMessageSearch(searchID, req.Query, searchOptions)
+		}
 
-	c.JSON(http.StatusOK, files)
+		if req.SearchType == "files" || req.SearchType == "" {
+			h.runFileSearch(searchID, req.Query, searchOptions)
+		}
+	}()
+
+	c.JSON(http.StatusOK, SearchResponse{
+		SearchID: searchID,
+		Status:   "started",
+		Query:    req.Query,
+	})
 }
 
 func (h *APIHandler) GetSearchHistory(c *gin.Context) {
@@ -411,29 +401,6 @@ func (h *APIHandler) CancelScan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"scan_id": scanID,
 		"status":  "cancelled",
-	})
-}
-
-// Export endpoints
-func (h *APIHandler) ExportSecrets(c *gin.Context) {
-	scanID := c.Param("id")
-
-	// TODO: Implement secret export
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=secrets_%s.json", scanID))
-	c.JSON(http.StatusOK, gin.H{
-		"scan_id": scanID,
-		"secrets": []interface{}{},
-	})
-}
-
-func (h *APIHandler) ExportMessages(c *gin.Context) {
-	searchID := c.Param("id")
-
-	// TODO: Implement message export
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=messages_%s.json", searchID))
-	c.JSON(http.StatusOK, gin.H{
-		"search_id": searchID,
-		"messages":  []interface{}{},
 	})
 }
 
@@ -671,5 +638,99 @@ func (h *APIHandler) sendWebSocketMessage(message WSMessage) {
 	if err != nil {
 		return
 	}
-	h.hub.BroadcastToType("dashboard", data)
+	h.hub.BroadcastToType("search", data)
+}
+
+func (h *APIHandler) runMessageSearch(searchID string, query string, options []slurp.SearchOption) {
+	messageChan, errorChan := h.slurper.SearchMessagesAsync(query, options...)
+
+	var err error
+
+Loop:
+	for {
+		select {
+		case message, ok := <-messageChan:
+			if !ok {
+				break Loop
+			}
+
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "message_result",
+				SearchID: searchID,
+				Data: MessageResult{
+					User:    message.User,
+					Date:    message.Date,
+					Channel: message.Channel,
+					Text:    message.Text,
+					Raw:     message.Raw,
+				},
+			})
+		case err = <-errorChan:
+			close(messageChan)
+		}
+	}
+	close(errorChan)
+
+	if err != nil {
+		h.sendWebSocketMessage(WSMessage{
+			Type:     "error",
+			SearchID: searchID,
+			Data:     map[string]string{"message": "Message search error: " + err.Error()},
+		})
+		return
+	}
+
+	// Send completion message
+	h.sendWebSocketMessage(WSMessage{
+		Type:     "complete",
+		SearchID: searchID,
+	})
+}
+
+func (h *APIHandler) runFileSearch(searchID string, query string, options []slurp.SearchOption) {
+	fileChan, errorChan := h.slurper.SearchFilesAsync(query, options...)
+
+	var err error
+
+Loop:
+	for {
+		select {
+		case file, ok := <-fileChan:
+			if !ok {
+				break Loop
+			}
+
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "file_result",
+				SearchID: searchID,
+				Data: FileResult{
+					Name:     file.Name,
+					Created:  file.Created,
+					Channels: file.Channels,
+					URL:      file.URL,
+					Filetype: file.Filetype,
+					User:     file.User,
+					Raw:      file.Raw,
+				},
+			})
+		case err = <-errorChan:
+			close(fileChan)
+		}
+	}
+	close(errorChan)
+
+	if err != nil {
+		h.sendWebSocketMessage(WSMessage{
+			Type:     "error",
+			SearchID: searchID,
+			Data:     map[string]string{"message": "File search error: " + err.Error()},
+		})
+		return
+	}
+
+	// Send completion message
+	h.sendWebSocketMessage(WSMessage{
+		Type:     "complete",
+		SearchID: searchID,
+	})
 }

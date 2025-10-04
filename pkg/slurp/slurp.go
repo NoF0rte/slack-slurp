@@ -66,6 +66,7 @@ type Channel struct {
 	IsPrivate        bool           `json:"is_private"`
 	IsDM             bool           `json:"is_im"`
 	IsGroupMessage   bool           `json:"is_mpim"`
+	IsExternal       bool           `json:"is_external"`
 	NumMembers       int            `json:"num_members"`
 	Created          slack.JSONTime `json:"created"`
 	Latest           slack.JSONTime `json:"latest"`
@@ -479,6 +480,7 @@ func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan F
 			defer wg.Done()
 			params := slack.NewSearchParameters()
 			params.Page = startingPage
+			params.Count = 100
 
 			for {
 				search, err := s.searchFiles(query, params)
@@ -1010,6 +1012,7 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 					IsPrivate:        channel.IsPrivate || channel.IsGroup,
 					IsDM:             channel.IsIM,
 					IsGroupMessage:   channel.IsMpIM,
+					IsExternal:       channel.IsExtShared,
 					NumMembers:       channel.NumMembers,
 					Created:          channel.Created,
 					ConnectedTeamIDs: channel.ConnectedTeamIDs,

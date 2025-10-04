@@ -71,6 +71,9 @@ export function ChannelCard({ channel }: ChannelCardProps) {
           <p className="text-xs text-gray-500">
             Latest {channel.latest != 0 ? formatDate(channel.latest) : "None"}
           </p>
+          <p className="text-xs text-gray-500">
+            External {channel.is_external ? "true" : "false"}
+          </p>
         </div>
       </div>
       

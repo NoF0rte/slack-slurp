@@ -29,13 +29,12 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		api.GET("/channels", handler.GetChannels)
 		api.POST("/channels/stop", handler.StopChannelLoading)
 		api.GET("/users", handler.GetUsers)
+
+		// Search Operations
 		api.POST("/domains/search", handler.SearchDomains)
 		api.POST("/domains/stop/:id", handler.StopDomainSearch)
 		api.POST("/urls/search", handler.SearchURLs)
-
-		// Search Operations
-		api.POST("/search/messages", handler.SearchMessages)
-		api.POST("/search/files", handler.SearchFiles)
+		api.POST("/search", handler.Search)
 		api.GET("/search/history", handler.GetSearchHistory)
 
 		// Secret Detection
@@ -45,8 +44,6 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		api.DELETE("/secrets/:id", handler.CancelScan)
 
 		// Export & Download
-		api.GET("/export/secrets/:id", handler.ExportSecrets)
-		api.GET("/export/messages/:id", handler.ExportMessages)
 		api.GET("/download/file/:id", handler.DownloadFile)
 	}
 

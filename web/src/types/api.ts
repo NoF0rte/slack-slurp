@@ -22,6 +22,7 @@ export interface Channel {
   is_private: boolean
   is_archived: boolean
   is_general: boolean
+  is_external: boolean
   latest: number
   created: number
   num_members: number
@@ -61,6 +62,7 @@ export interface SearchRequest {
   before?: string
   after?: string
   file_types?: string[]
+  search_type?: 'messages' | 'files'
 }
 
 export interface SecretScanRequest {
@@ -120,8 +122,33 @@ export interface URLSearchResponse {
   total_found?: number
 }
 
+export interface SearchResponse {
+  search_id: string
+  status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
+  query: string
+  search_type?: 'messages' | 'files' | 'both'
+}
+
+export interface MessageResult {
+  user: string
+  date: string
+  channel: string
+  text: string
+  raw: any
+}
+
+export interface FileResult {
+  name: string
+  created: string
+  channels: string[]
+  url: string
+  filetype: string
+  user: string
+  raw: any
+}
+
 export interface WSMessage {
-  type: 'error' | 'complete' | 'connected' | 'domain_result' | 'url_result'
+  type: 'error' | 'complete' | 'connected' | 'domain_result' | 'url_result' | 'message_result' | 'file_result'
   data: any
   scan_id?: string
   search_id?: string
