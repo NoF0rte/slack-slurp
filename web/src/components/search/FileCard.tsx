@@ -76,7 +76,7 @@ export function FileCard({ file }: FileCardProps) {
             </span>
           </div>
           
-          {file.channels.length > 0 && (
+          {file.channels && file.channels.length > 0 && (
             <div className="flex items-center space-x-2">
               <ChatBubbleLeftIcon className="w-4 h-4 text-gray-400" />
               <div className="flex flex-wrap gap-1">

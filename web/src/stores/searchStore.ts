@@ -14,7 +14,7 @@ interface SearchState {
   error: string | null
   currentSearch: SearchResponse | null
   dismissComplete: boolean
-  searchType?: 'messages' | 'files'
+  searchType: 'messages' | 'files' | 'both'
   
   // Actions
   search: (request: SearchRequest) => Promise<void>
@@ -22,7 +22,7 @@ interface SearchState {
   clearError: () => void
   stopSearch: () => void
   setDismissComplete: (dismiss: boolean) => void
-  setSearchType: (type: 'messages' | 'files' | undefined) => void
+  setSearchType: (type: 'messages' | 'files' | 'both') => void
 }
 
 export const useSearchStore = create<SearchState>((set, get) => ({
@@ -33,7 +33,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   error: null,
   currentSearch: null,
   dismissComplete: false,
-  searchType: undefined,
+  searchType: 'both',
 
   search: async (request: SearchRequest) => {
     set({ isLoading: true, error: null, isSearching: true, messages: [], files: [] })
@@ -130,7 +130,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     set({ dismissComplete: dismiss })
   },
 
-  setSearchType: (type?: 'messages' | 'files') => {
+  setSearchType: (type?: 'messages' | 'files' | 'both') => {
     set({ searchType: type })
   }
 }))

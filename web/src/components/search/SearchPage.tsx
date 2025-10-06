@@ -13,7 +13,9 @@ import {
   DocumentTextIcon,
   ChatBubbleLeftIcon,
   ArrowDownTrayIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline'
 
 export function SearchPage() {
@@ -38,6 +40,9 @@ export function SearchPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [beforeDate, setBeforeDate] = useState('')
   const [afterDate, setAfterDate] = useState('')
+  const [fileTypes, setFileTypes] = useState('')
+  const [showMessages, setShowMessages] = useState(true)
+  const [showFiles, setShowFiles] = useState(true)
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -46,11 +51,13 @@ export function SearchPage() {
     }
 
     const request = {
+      search_type: searchType,
       query: searchQuery,
       channels: selectedChannels,
       users: selectedUsers,
       before: beforeDate,
-      after: afterDate
+      after: afterDate,
+      file_types: fileTypes ? fileTypes.split(',').map(type => type.trim()).filter(type => type.length > 0) : undefined
     }
 
     // Reset dismiss state for new search
@@ -107,82 +114,113 @@ export function SearchPage() {
         )}
       </div>
 
-      {/* Search Type Selection */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
-        <label className="block text-sm font-medium text-gray-300 mb-3">
-          Search Type
-        </label>
-        <div className="flex space-x-4">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={!searchType || searchType === 'messages'}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setSearchType(searchType === 'files' ? undefined : 'messages')
-                } else {
-                  // If unchecking messages, check if files is also unchecked
-                  if (!searchType) {
-                    setSearchType('files')
-                  } else if (searchType === 'messages') {
-                    setSearchType(undefined)
-                  }
-                }
-              }}
-              disabled={isSearching}
-              className="mr-2 text-blue-600"
-            />
-            <span className="text-gray-300">Messages</span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={!searchType || searchType === 'files'}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setSearchType(searchType === 'messages' ? undefined : 'files')
-                } else {
-                  // If unchecking messages, check if files is also unchecked
-                  if (!searchType) {
-                    setSearchType('messages')
-                  } else if (searchType === 'files') {
-                    setSearchType(undefined)
-                  }
-                }
-              }}
-              disabled={isSearching}
-              className="mr-2 text-blue-600"
-            />
-            <span className="text-gray-300">Files</span>
-          </label>
-        </div>
-        <p className="text-xs text-gray-400 mt-2">
-          Leave both unchecked to search messages and files. Check one or both to search specific types.
-        </p>
-      </div>
-
       {/* Search Query Form */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Search Query
-            </label>
-            <div className="relative">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Search Query
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Enter your search query..."
+                  disabled={isSearching}
+                  className="w-full px-3 py-2 pl-10 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+                />
+                <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Use Slack's search syntax. Examples: "from:@username", "in:#channel", "has:link", "before:2024-01-01"
+              </p>
+            </div>
+            
+            {/* Search Type Selection */}
+            <div className="flex-shrink-0">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Search Type
+              </label>
+              <div className="flex bg-gray-700 rounded-lg p-1">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="searchType"
+                    value="messages"
+                    checked={searchType === 'messages'}
+                    onChange={(e) => setSearchType(e.target.value as 'messages')}
+                    disabled={isSearching}
+                    className="sr-only"
+                  />
+                  <span className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    searchType === 'messages'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  }`}>
+                    Messages
+                  </span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="searchType"
+                    value="files"
+                    checked={searchType === 'files'}
+                    onChange={(e) => setSearchType(e.target.value as 'files')}
+                    disabled={isSearching}
+                    className="sr-only"
+                  />
+                  <span className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    searchType === 'files'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  }`}>
+                    Files
+                  </span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="searchType"
+                    value="both"
+                    checked={searchType === 'both' || searchType === undefined}
+                    onChange={(e) => setSearchType(e.target.value as 'both')}
+                    disabled={isSearching}
+                    className="sr-only"
+                  />
+                  <span className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    searchType === 'both' || searchType === undefined
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  }`}>
+                    Both
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* File Types Field - Only show when files or both is selected */}
+          {(searchType === 'files' || searchType === 'both' || searchType === undefined) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                File Types (Optional)
+              </label>
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter your search query..."
+                value={fileTypes}
+                onChange={(e) => setFileTypes(e.target.value)}
+                placeholder="e.g., pdf, doc, jpg, png (comma-separated)"
                 disabled={isSearching}
-                className="w-full px-3 py-2 pl-10 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
               />
-              <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <p className="text-xs text-gray-400 mt-1">
+                Specify file types to search for. Leave empty to search all file types.
+              </p>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Use Slack's search syntax. Examples: "from:@username", "in:#channel", "has:link", "before:2024-01-01"
-            </p>
-          </div>
+          )}
         </div>
       </div>
 
@@ -278,30 +316,50 @@ export function SearchPage() {
           {/* Messages Results */}
           {messages.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowMessages(!showMessages)}
+                className="flex items-center space-x-2 text-left w-full hover:bg-gray-700 rounded-lg p-2 transition-colors"
+              >
+                {showMessages ? (
+                  <ChevronDownIcon className="w-5 h-5 text-blue-400" />
+                ) : (
+                  <ChevronRightIcon className="w-5 h-5 text-blue-400" />
+                )}
                 <ChatBubbleLeftIcon className="w-5 h-5 text-blue-400" />
                 <h2 className="text-lg font-semibold text-white">Messages ({messages.length})</h2>
-              </div>
-              <div className="space-y-3">
-                {messages.map((message, index) => (
-                  <MessageCard key={index} message={message} />
-                ))}
-              </div>
+              </button>
+              {showMessages && (
+                <div className="space-y-3">
+                  {messages.map((message, index) => (
+                    <MessageCard key={index} message={message} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Files Results */}
           {files.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowFiles(!showFiles)}
+                className="flex items-center space-x-2 text-left w-full hover:bg-gray-700 rounded-lg p-2 transition-colors"
+              >
+                {showFiles ? (
+                  <ChevronDownIcon className="w-5 h-5 text-green-400" />
+                ) : (
+                  <ChevronRightIcon className="w-5 h-5 text-green-400" />
+                )}
                 <DocumentTextIcon className="w-5 h-5 text-green-400" />
                 <h2 className="text-lg font-semibold text-white">Files ({files.length})</h2>
-              </div>
-              <div className="space-y-3">
-                {files.map((file, index) => (
-                  <FileCard key={index} file={file} />
-                ))}
-              </div>
+              </button>
+              {showFiles && (
+                <div className="space-y-3">
+                  {files.map((file, index) => (
+                    <FileCard key={index} file={file} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -372,10 +372,23 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 					seconds, _ := strconv.ParseInt(strings.Split(match.Timestamp, ".")[0], 10, 64)
 					date := time.Unix(seconds, 0)
 
+					channel := match.Channel.Name
+					if match.Channel.IsPrivate { // IsPrivate appears to refer to DMs?
+						users, err2 := s.getUsersInfo(channel)
+						if err2 == nil && users != nil {
+							u := (*users)[0]
+
+							channel = u.Name
+							if u.RealName != "" {
+								channel = u.RealName
+							}
+						}
+					}
+
 					messageChan <- Message{
 						User:    match.Username,
 						Date:    date,
-						Channel: match.Channel.Name,
+						Channel: channel,
 						Text:    match.Text,
 						Raw:     match,
 					}

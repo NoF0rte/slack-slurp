@@ -62,7 +62,7 @@ export interface SearchRequest {
   before?: string
   after?: string
   file_types?: string[]
-  search_type?: 'messages' | 'files'
+  search_type?: 'messages' | 'files' | 'both'
 }
 
 export interface SecretScanRequest {

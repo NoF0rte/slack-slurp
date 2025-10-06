@@ -80,7 +80,7 @@ type SearchRequest struct {
 	SearchFiltersRequest
 	Query      string   `json:"query"`
 	FileTypes  []string `json:"file_types,omitempty"`
-	SearchType string   `json:"search_type,omitempty"` // "messages", "files"
+	SearchType string   `json:"search_type"` // "messages", "files", "both"
 }
 
 type DomainResult struct {
@@ -332,11 +332,15 @@ func (h *APIHandler) Search(c *gin.Context) {
 		return
 	}
 
+	if len(req.FileTypes) != 0 {
+		searchOptions = append(searchOptions, slurp.SearchFileTypes(req.FileTypes...))
+	}
+
 	searchID := generateSearchID()
 
 	go func() {
 		var err error
-		if req.SearchType == "messages" || req.SearchType == "" {
+		if req.SearchType == "messages" || req.SearchType == "both" {
 			err = h.runMessageSearch(searchID, req.Query, searchOptions)
 		}
 
@@ -350,7 +354,7 @@ func (h *APIHandler) Search(c *gin.Context) {
 			return
 		}
 
-		if req.SearchType == "files" || req.SearchType == "" {
+		if req.SearchType == "files" || req.SearchType == "both" {
 			err = h.runFileSearch(searchID, req.Query, searchOptions)
 		}
 
