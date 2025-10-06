@@ -1,23 +1,18 @@
+import React from 'react'
 import { FileResult } from '../../types/api'
 import { UserIcon, CalendarIcon, ChatBubbleLeftIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 
 interface FileCardProps {
   file: FileResult
+  highlightText?: (text: string, searchTerm?: string) => React.ReactNode
+  searchTerm?: string
 }
 
-export function FileCard({ file }: FileCardProps) {
+export function FileCard({ file, highlightText, searchTerm }: FileCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString()
   }
-
-  // const formatFileSize = (bytes: number) => {
-  //   if (bytes === 0) return '0 Bytes'
-  //   const k = 1024
-  //   const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  //   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  //   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  // }
 
   const getFileIcon = (filetype: string) => {
     const type = filetype.toLowerCase()
@@ -44,9 +39,9 @@ export function FileCard({ file }: FileCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-white truncate">
-              {file.name}
+              {highlightText ? highlightText(file.name, searchTerm) : file.name}
             </h3>
-            {file.id && (
+             {file.id && (
               <a
                 href={`/api/download/${file.id}`}
                 target="_blank"

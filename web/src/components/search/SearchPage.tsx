@@ -43,6 +43,7 @@ export function SearchPage() {
   const [fileTypes, setFileTypes] = useState('')
   const [showMessages, setShowMessages] = useState(true)
   const [showFiles, setShowFiles] = useState(true)
+  const [filterQuery, setFilterQuery] = useState('')
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -91,6 +92,80 @@ export function SearchPage() {
       filename,
       data: exportData,
       timestamp
+    })
+  }
+
+  // Filter results based on filter query
+  const filteredMessages = messages.filter(message => {
+    if (!filterQuery) return true
+    const query = filterQuery.toLowerCase()
+    return (
+      message.text.toLowerCase().includes(query) ||
+      message.user.toLowerCase().includes(query) ||
+      message.channel.toLowerCase().includes(query)
+    )
+  })
+
+  const filteredFiles = files.filter(file => {
+    if (!filterQuery) return true
+    const query = filterQuery.toLowerCase()
+    return (
+      file.name.toLowerCase().includes(query) ||
+      file.user.toLowerCase().includes(query) ||
+      file.filetype.toLowerCase().includes(query) ||
+      (file.channels && file.channels.some(channel => channel.toLowerCase().includes(query)))
+    )
+  })
+
+  // Highlight search terms in text
+  const highlightText = (text: string, searchTerm?: string) => {
+    if (!searchTerm) return text
+    
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    
+    return parts.map((part, index) => 
+      regex.test(part) ? (
+        <mark key={index} className="bg-yellow-200 text-yellow-900 px-1 rounded">
+          {part}
+        </mark>
+      ) : part
+    )
+  }
+
+  // Render Slack text with code blocks and inline code
+  const renderSlackText = (text: string, searchTerm?: string) => {
+    // Split by code blocks first
+    const codeBlockRegex = /```([\s\S]*?)```/g
+    const parts = text.split(codeBlockRegex)
+    
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        // This is a code block
+        return (
+          <pre key={index} className="bg-gray-900 text-gray-100 p-3 rounded-md overflow-x-auto my-2">
+            <code className="text-sm">{part}</code>
+          </pre>
+        )
+      } else {
+        // This is regular text, process inline code and highlight
+        const inlineCodeRegex = /`([^`]+)`/g
+        const textParts = part.split(inlineCodeRegex)
+        
+        return textParts.map((textPart, textIndex) => {
+          if (textIndex % 2 === 1) {
+            // This is inline code
+            return (
+              <code key={textIndex} className="bg-gray-700 text-gray-200 px-1 py-0.5 rounded text-sm font-mono">
+                {textPart}
+              </code>
+            )
+          } else {
+            // This is regular text, apply highlighting
+            return searchTerm ? highlightText(textPart, searchTerm) : textPart
+          }
+        })
+      }
     })
   }
 
@@ -310,6 +385,28 @@ export function SearchPage() {
         </div>
       )}
 
+      {/* Results Filter */}
+      {(messages.length > 0 || files.length > 0) && (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Filter Results
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Filter results by content, user, channel, or file type..."
+              className="w-full px-3 py-2 pl-10 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+            />
+            <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Showing {filteredMessages.length} of {messages.length} messages and {filteredFiles.length} of {files.length} files
+          </p>
+        </div>
+      )}
+
       {/* Results */}
       {(messages.length > 0 || files.length > 0) && (
         <div className="space-y-6">
@@ -326,12 +423,14 @@ export function SearchPage() {
                   <ChevronRightIcon className="w-5 h-5 text-blue-400" />
                 )}
                 <ChatBubbleLeftIcon className="w-5 h-5 text-blue-400" />
-                <h2 className="text-lg font-semibold text-white">Messages ({messages.length})</h2>
+                <h2 className="text-lg font-semibold text-white">
+                  Messages ({filteredMessages.length}{filteredMessages.length !== messages.length ? ` of ${messages.length}` : ''})
+                </h2>
               </button>
               {showMessages && (
                 <div className="space-y-3">
-                  {messages.map((message, index) => (
-                    <MessageCard key={index} message={message} />
+                  {filteredMessages.map((message, index) => (
+                    <MessageCard key={index} message={message} highlightText={renderSlackText} searchTerm={searchQuery} />
                   ))}
                 </div>
               )}
@@ -351,12 +450,14 @@ export function SearchPage() {
                   <ChevronRightIcon className="w-5 h-5 text-green-400" />
                 )}
                 <DocumentTextIcon className="w-5 h-5 text-green-400" />
-                <h2 className="text-lg font-semibold text-white">Files ({files.length})</h2>
+                <h2 className="text-lg font-semibold text-white">
+                  Files ({filteredFiles.length}{filteredFiles.length !== files.length ? ` of ${files.length}` : ''})
+                </h2>
               </button>
               {showFiles && (
                 <div className="space-y-3">
-                  {files.map((file, index) => (
-                    <FileCard key={index} file={file} />
+                  {filteredFiles.map((file, index) => (
+                    <FileCard key={index} file={file} highlightText={highlightText} searchTerm={searchQuery} />
                   ))}
                 </div>
               )}
