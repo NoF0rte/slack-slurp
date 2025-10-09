@@ -18,14 +18,11 @@ export function DomainsPage() {
     results, 
     isLoading, 
     isSearching, 
-    dismissComplete,
     error, 
-    currentSearch, 
     searchDomains, 
     clearResults, 
     clearError, 
-    stopSearch,
-    setDismissComplete
+    stopSearch
   } = useDomainsStore()
   
   const [domainsInput, setDomainsInput] = useState('')
@@ -62,8 +59,6 @@ export function DomainsPage() {
       request.after = afterDate
     }
     
-    // Reset dismiss state for new search
-    setDismissComplete(false)
     await searchDomains(request)
   }
 
@@ -121,64 +116,10 @@ export function DomainsPage() {
         </div>
       </div>
 
-      {/* Search Status Banner */}
-      {isSearching && (
-        <div className="bg-blue-900 border border-blue-700 rounded-lg p-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0">
-              <ArrowPathIcon className="w-8 h-8 text-blue-400 animate-spin" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-blue-100">Search in Progress</h3>
-              <p className="text-blue-200 mt-1">
-                Searching Slack for domain mentions... Results will appear below as they are found.
-              </p>
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                onClick={handleStop}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 cursor-pointer"
-              >
-                <StopIcon className="w-4 h-4" />
-                <span>Stop Search</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Search Complete Banner */}
-      {!isSearching && !isLoading && results.length > 0 && currentSearch?.status === 'completed' && !dismissComplete && (
-        <div className="bg-green-900 border border-green-700 rounded-lg p-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">✓</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-green-100">Search Complete</h3>
-              <p className="text-green-200 mt-1">
-                Found {results.length} domain{results.length !== 1 ? 's' : ''} in Slack messages.
-              </p>
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                onClick={() => setDismissComplete(true)}
-                className="text-green-300 hover:text-green-100 cursor-pointer"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Cards */}
+      {/* Stats Card and Search Status */}
       {results.length > 0 && (
-        <div className="flex justify-start">
+        <div className="flex items-center justify-between">
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 inline-block">
             <div className="flex items-center">
               <GlobeAltIcon className="w-8 h-8 text-green-400" />
@@ -188,6 +129,23 @@ export function DomainsPage() {
               </div>
             </div>
           </div>
+
+          {/* Search Status */}
+          {isSearching && (
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <ArrowPathIcon className="w-5 h-5 text-blue-400 animate-spin" />
+                <span className="text-blue-400 text-sm">Searching Slack for domain mentions...</span>
+              </div>
+              <button
+                onClick={handleStop}
+                className="flex items-center space-x-2 px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 cursor-pointer"
+              >
+                <StopIcon className="w-4 h-4" />
+                <span>Stop</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

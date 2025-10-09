@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout'
 import { AuthSetup } from './components/auth/AuthSetup'
 import { Router } from './components/Router'
 import { useAuthStore } from './stores/authStore'
+import { ArrowPathIcon } from '@heroicons/react/24/outline'
 
 function App() {
   const { isAuthenticated, testAuth } = useAuthStore()
@@ -30,9 +31,9 @@ function App() {
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen bg-slack-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-gray-300">Checking authentication...</p>
+        <div className="flex items-center space-x-2">
+          <ArrowPathIcon className="w-5 h-5 animate-spin text-blue-400" />
+          <span className="text-gray-400">Checking authentication...</span>
         </div>
       </div>
     )

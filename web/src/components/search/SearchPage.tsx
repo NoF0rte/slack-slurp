@@ -13,7 +13,6 @@ import {
   DocumentTextIcon,
   ChatBubbleLeftIcon,
   ArrowDownTrayIcon,
-  CheckCircleIcon,
   ChevronDownIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline'
@@ -23,15 +22,12 @@ export function SearchPage() {
     messages,
     files,
     isSearching, 
-    dismissComplete,
     error, 
-    currentSearch, 
     searchType,
     search,
     clearResults, 
     clearError, 
     stopSearch,
-    setDismissComplete,
     setSearchType
   } = useSearchStore()
 
@@ -61,9 +57,6 @@ export function SearchPage() {
       file_types: fileTypes ? fileTypes.split(',').map(type => type.trim()).filter(type => type.length > 0) : undefined
     }
 
-    // Reset dismiss state for new search
-    setDismissComplete(false)
-
     try {
       await search(request)
     } catch (err) {
@@ -71,9 +64,6 @@ export function SearchPage() {
     }
   }
 
-  const handleStop = () => {
-    stopSearch()
-  }
 
   const handleExportResults = () => {
     const timestamp = getCurrentTimestamp()
@@ -178,16 +168,69 @@ export function SearchPage() {
           <p className="text-gray-400">Search Slack messages and files</p>
         </div>
         
-        {(messages.length > 0 || files.length > 0) && (
+        <div className="flex items-center space-x-3">
           <button
             onClick={handleExportResults}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            disabled={isSearching || (messages.length === 0 && files.length === 0)}
+            className="flex items-center space-x-2 px-4 py-2 bg-slack-blue text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ArrowDownTrayIcon className="w-4 h-4" />
             <span>Export Results</span>
           </button>
-        )}
+          
+          <button
+            onClick={clearResults}
+            disabled={isSearching}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm font-medium text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+            <span>Clear Results</span>
+          </button>
+        </div>
       </div>
+
+      {/* Stats Cards and Search Status */}
+      {(messages.length > 0 || files.length > 0 || isSearching) && (
+        <div className="flex items-center justify-between">
+          <div className="flex space-x-4">
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 inline-block">
+              <div className="flex items-center">
+                <ChatBubbleLeftIcon className="w-8 h-8 text-blue-400" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-400">Messages Found</p>
+                  <p className="text-2xl font-bold text-white">{messages.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 inline-block">
+              <div className="flex items-center">
+                <DocumentTextIcon className="w-8 h-8 text-green-400" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-400">Files Found</p>
+                  <p className="text-2xl font-bold text-white">{files.length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Search Status - Right aligned */}
+          {isSearching && (
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <ArrowPathIcon className="w-5 h-5 text-blue-400 animate-spin" />
+                <span className="text-blue-400 text-sm">Searching through messages and files...</span>
+              </div>
+              <button
+                onClick={stopSearch}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+              >
+                <StopIcon className="w-4 h-4" />
+                <span>Stop</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search Query Form */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
@@ -327,24 +370,6 @@ export function SearchPage() {
           <span>{isSearching ? 'Searching...' : 'Search'}</span>
         </button>
 
-        {isSearching && (
-          <button
-            onClick={handleStop}
-            className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-          >
-            <StopIcon className="w-4 h-4" />
-            <span>Stop</span>
-          </button>
-        )}
-
-        {(messages.length > 0 || files.length > 0) && (
-          <button
-            onClick={clearResults}
-            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-          >
-            <span>Clear Results</span>
-          </button>
-        )}
       </div>
 
       {/* Error Display */}
@@ -364,26 +389,6 @@ export function SearchPage() {
         </div>
       )}
 
-      {/* Completion Status */}
-      {currentSearch?.status === 'completed' && !dismissComplete && (
-        <div className="bg-green-900/50 border border-green-500 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <CheckCircleIcon className="w-5 h-5 text-green-400" />
-              <span className="text-green-400 font-medium">Search Complete</span>
-            </div>
-            <button
-              onClick={() => setDismissComplete(true)}
-              className="text-green-400 hover:text-green-300 text-sm"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="text-green-300 mt-1">
-            Found {messages.length} messages and {files.length} files
-          </p>
-        </div>
-      )}
 
       {/* Results Filter */}
       {(messages.length > 0 || files.length > 0) && (
