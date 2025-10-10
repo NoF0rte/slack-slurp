@@ -13,6 +13,8 @@ export interface AuthTestResult {
   bot_id?: string
 }
 
+export type ChannelType = 'all' | 'public' | 'private' | 'direct' | 'group'
+
 export interface Channel {
   id: string
   name: string

@@ -1,25 +1,38 @@
 import { create } from 'zustand'
-import { Channel } from '../types/api'
+import { Channel, ChannelType } from '../types/api'
 import { api } from '../utils/api'
 import { wsManager } from '../utils/websocket'
+import { useSearchChannelsStore } from './searchChannelsStore'
 
 interface ChannelsState {
   channels: Channel[]
+  selectedType: ChannelType
   isLoading: boolean
   isAsyncLoading: boolean
   error: string | null
   fetchChannels: (withActivity: boolean, types?: string[]) => Promise<void>
+  setSelectedType: (channelType: ChannelType) => void
   clearError: () => void
   stopLoading: () => void
+  syncToSearchCache: () => void
 }
 
-export const useChannelsStore = create<ChannelsState>((set) => ({
+export const useChannelsStore = create<ChannelsState>((set, get) => ({
   channels: [],
+  selectedType: 'all' as ChannelType,
   isLoading: false,
   isAsyncLoading: false,
   error: null,
   
   fetchChannels: async (withLatest: boolean, types?: string[]) => {
+    // Prevent duplicate async loading
+    const state = get()
+    if (withLatest) {
+      if (state.isAsyncLoading) {
+        return // Already loading asynchronously, don't start another load
+      }
+    }
+    
     set({ isLoading: true, error: null })
     
     try {
@@ -83,9 +96,9 @@ export const useChannelsStore = create<ChannelsState>((set) => ({
       }
 
       set({ 
-        channels: response.data, 
+        channels: response.data,
         isLoading: false,
-        error: null 
+        error: null,
       })
     } catch (error: any) {
       set({ 
@@ -94,7 +107,11 @@ export const useChannelsStore = create<ChannelsState>((set) => ({
       })
     }
   },
-  
+
+  setSelectedType: (channelType: ChannelType) => {
+    set({selectedType: channelType})
+  },
+
   clearError: () => set({ error: null }),
 
   stopLoading: () => {
@@ -104,5 +121,10 @@ export const useChannelsStore = create<ChannelsState>((set) => ({
       isLoading: false,
       isAsyncLoading: false,
     })
+  },
+
+  syncToSearchCache: () => {
+    const searchStore = useSearchChannelsStore.getState()
+    searchStore.updateChannels(get().channels)
   },
 }))

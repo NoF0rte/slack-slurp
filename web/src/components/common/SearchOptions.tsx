@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useChannelsStore } from '../../stores/channelsStore'
+import { useSearchChannelsStore } from '../../stores/searchChannelsStore'
 import { useUsersStore } from '../../stores/usersStore'
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown'
 
@@ -26,14 +26,19 @@ export function SearchOptions({
   onBeforeDateChange,
   onAfterDateChange
 }: SearchOptionsProps) {
-  const { channels, fetchChannels } = useChannelsStore()
+  const { channels, fetchChannels } = useSearchChannelsStore()
   const { users, fetchUsers } = useUsersStore()
 
   // Load channels and users on component mount
   useEffect(() => {
-    fetchChannels(false)
-    fetchUsers()
-  }, [fetchChannels, fetchUsers])
+    if (channels.length === 0) {
+      fetchChannels()
+    }
+
+    if (users.length === 0) {
+      fetchUsers()
+    }
+  }, [channels.length, users.length, fetchChannels, fetchUsers])
 
   // Prepare options for dropdowns
   const channelOptions = channels

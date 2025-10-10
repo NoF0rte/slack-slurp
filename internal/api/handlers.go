@@ -568,7 +568,7 @@ func (h *APIHandler) runChannelLatest(channels []slurp.Channel) {
 	ctx := h.channelCtx
 	h.channelMutex.RUnlock()
 
-	// Use a worker pool with 2 goroutines for concurrent processing
+	// Use a worker pool with 10 goroutines for concurrent processing
 	const numWorkers = 10
 	channelChan := make(chan slurp.Channel, len(channels))
 	resultChan := make(chan slurp.Channel, len(channels))

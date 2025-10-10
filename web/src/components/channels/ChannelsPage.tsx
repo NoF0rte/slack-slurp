@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useChannelsStore } from '../../stores/channelsStore'
 import { ChannelCard } from './ChannelCard'
+import { Channel } from '../../types/api'
 import { downloadJSON, generateFilename, getCurrentTimestamp } from '../../utils/export'
 import { 
   FunnelIcon, 
@@ -24,15 +25,26 @@ const channelTypeOptions = [
 ]
 
 export function ChannelsPage() {
-  const { channels, isLoading, isAsyncLoading, error, fetchChannels, clearError, stopLoading } = useChannelsStore()
-  const [selectedType, setSelectedType] = useState<ChannelType>('all')
+  const { channels, selectedType, isLoading, isAsyncLoading, error, fetchChannels, setSelectedType, clearError, stopLoading, syncToSearchCache } = useChannelsStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
+  const [initialized, setInitialized] = useState<boolean>(false)
 
   useEffect(() => {
-    const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
-    fetchChannels(true, types)
+    if (initialized || channels.length === 0) {
+      const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
+      fetchChannels(true, types)
+    }
+
+    setInitialized(true)
   }, [selectedType, fetchChannels])
+
+  // Sync to search cache when channels are loaded and we have all types
+  useEffect(() => {
+    if (!isAsyncLoading && channels.length > 0 && selectedType === 'all') {
+      syncToSearchCache()
+    }
+  }, [channels.length, isAsyncLoading, selectedType, syncToSearchCache])
 
   const filteredChannels = channels.filter(channel => {
     if (!searchQuery) return true
@@ -43,52 +55,21 @@ export function ChannelsPage() {
     )
   })
 
+  const sortChannels = (a: Channel, b: Channel) => {
+    // Sort by latest activity first (most recent first)
+    if (b.latest !== a.latest) {
+      return b.latest - a.latest
+    }
+    // Then by number of members (most members first)
+    return b.num_members - a.num_members
+  }
+
   const groupedChannels = {
-    public: filteredChannels.filter(ch => !ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im)
-      .sort((a, b) => {
-        // Sort by latest activity first (most recent first)
-        if (b.latest !== a.latest) {
-          return b.latest - a.latest
-        }
-        // Then by number of members (most members first)
-        return b.num_members - a.num_members
-      }),
-    private: filteredChannels.filter(ch => ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im)
-      .sort((a, b) => {
-        // Sort by latest activity first (most recent first)
-        if (b.latest !== a.latest) {
-          return b.latest - a.latest
-        }
-        // Then by number of members (most members first)
-        return b.num_members - a.num_members
-      }),
-    direct: filteredChannels.filter(ch => ch.is_im)
-      .sort((a, b) => {
-        // Sort by latest activity first (most recent first)
-        if (b.latest !== a.latest) {
-          return b.latest - a.latest
-        }
-        // Then by number of members (most members first)
-        return b.num_members - a.num_members
-      }),
-    group: filteredChannels.filter(ch => ch.is_mpim)
-      .sort((a, b) => {
-        // Sort by latest activity first (most recent first)
-        if (b.latest !== a.latest) {
-          return b.latest - a.latest
-        }
-        // Then by number of members (most members first)
-        return b.num_members - a.num_members
-      }),
-    archived: filteredChannels.filter(ch => ch.is_archived)
-      .sort((a, b) => {
-        // Sort by latest activity first (most recent first)
-        if (b.latest !== a.latest) {
-          return b.latest - a.latest
-        }
-        // Then by number of members (most members first)
-        return b.num_members - a.num_members
-      }),
+    public: filteredChannels.filter(ch => !ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im).sort(sortChannels),
+    private: filteredChannels.filter(ch => ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im).sort(sortChannels),
+    direct: filteredChannels.filter(ch => ch.is_im).sort(sortChannels),
+    group: filteredChannels.filter(ch => ch.is_mpim).sort(sortChannels),
+    archived: filteredChannels.filter(ch => ch.is_archived).sort(sortChannels),
   }
 
   const getGroupTitle = (group: keyof typeof groupedChannels) => {
