@@ -4,7 +4,8 @@ import {
   ChatBubbleLeftRightIcon, 
   UserGroupIcon,
   LockClosedIcon,
-  ArchiveBoxIcon
+  ArchiveBoxIcon,
+  GlobeAltIcon
 } from '@heroicons/react/24/outline'
 
 interface ChannelCardProps {
@@ -15,6 +16,10 @@ export function ChannelCard({ channel }: ChannelCardProps) {
   const getChannelIcon = () => {
     if (channel.is_archived) {
       return <ArchiveBoxIcon className="w-5 h-5 text-gray-400" />
+    }
+
+    if (channel.is_external) {
+      return <GlobeAltIcon className="w-5 h-5 text-purple-500" />
     }
 
     if (channel.is_mpim) {
@@ -37,6 +42,7 @@ export function ChannelCard({ channel }: ChannelCardProps) {
     if (channel.is_mpim) return 'Group Message'
     if (channel.is_private) return 'Private Channel'
     if (channel.is_im) return 'Direct Message'
+    if (channel.is_external) return 'External Channel'
     return 'Public Channel'
   }
   
@@ -71,9 +77,6 @@ export function ChannelCard({ channel }: ChannelCardProps) {
           <p className="text-xs text-gray-500">
             Latest {channel.latest != 0 ? formatDate(channel.latest) : "None"}
           </p>
-          <p className="text-xs text-gray-500">
-            External {channel.is_external ? "true" : "false"}
-          </p>
         </div>
       </div>
       
@@ -82,6 +85,29 @@ export function ChannelCard({ channel }: ChannelCardProps) {
           <p className="text-sm text-gray-300 line-clamp-2">
             {channel.topic}
           </p>
+        </div>
+      )}
+      
+      {channel.is_external && channel.shared_teams && channel.shared_teams.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-700">
+          <p className="text-xs text-gray-400 mb-2">Shared with:</p>
+          <div className="flex flex-wrap gap-2">
+            {channel.shared_teams.map((team, index) => (
+              <div key={index} className="flex items-center space-x-2 bg-gray-700 rounded-md px-2 py-1">
+                {team.image && (
+                  <img 
+                    src={team.image} 
+                    alt={team.name}
+                    className="w-4 h-4 rounded-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                )}
+                <span className="text-xs text-gray-300">{team.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       

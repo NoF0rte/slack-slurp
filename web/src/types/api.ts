@@ -13,6 +13,11 @@ export interface AuthTestResult {
   bot_id?: string
 }
 
+export interface Team {
+  name: string
+  image: string
+}
+
 export type ChannelType = 'all' | 'public' | 'private' | 'direct' | 'group'
 
 export interface Channel {
@@ -28,6 +33,7 @@ export interface Channel {
   latest: number
   created: number
   num_members: number
+  shared_teams: Team[]
   topic?: string
 }
 

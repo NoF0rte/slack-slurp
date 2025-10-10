@@ -608,6 +608,27 @@ func (h *APIHandler) runChannelLatest(channels []slurp.Channel) {
 						channel.Latest = slack.JSONTime(t)
 					}
 
+					if channel.IsExternal {
+						var sharedTeams []slurp.Team
+						chanInfo, err := h.slurper.GetChannelInfo(channel.ID)
+						if err == nil {
+							for _, teamID := range chanInfo.SharedTeamIDs {
+								team, err := h.slurper.GetTeamInfo(teamID)
+								if err != nil {
+									continue
+								}
+
+								icon := team.Icon["image_230"]
+								sharedTeams = append(sharedTeams, slurp.Team{
+									Name:  team.Name,
+									Image: icon.(string),
+								})
+							}
+						}
+
+						channel.SharedTeams = sharedTeams
+					}
+
 					resultChan <- channel
 				case <-ctx.Done():
 					errorChan <- ctx.Err()

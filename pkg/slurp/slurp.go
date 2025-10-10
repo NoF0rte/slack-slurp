@@ -58,6 +58,11 @@ type File struct {
 	Raw      slack.File `json:"-"`
 }
 
+type Team struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
+}
+
 type Channel struct {
 	ID               string         `json:"id"`
 	Name             string         `json:"name"`
@@ -71,8 +76,8 @@ type Channel struct {
 	NumMembers       int            `json:"num_members"`
 	Created          slack.JSONTime `json:"created"`
 	Latest           slack.JSONTime `json:"latest"`
+	SharedTeams      []Team         `json:"shared_teams"`
 	ConnectedTeamIDs []string       `json:"connected_team_ids"`
-	SharedTeamIDs    []string       `json:"shared_team_ids"`
 	InternalTeamIDs  []string       `json:"internal_team_ids"`
 }
 
@@ -937,7 +942,18 @@ func (s Slurper) GetLatestMessage(channelID string) (*slack.Message, error) {
 	}
 }
 
-func (s Slurper) getChannelInfo(channelID string) (*slack.Channel, error) {
+func (s Slurper) GetTeamInfo(teamID string) (*slack.TeamInfo, error) {
+	for {
+		team, err := s.client.GetOtherTeamInfo(teamID)
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return team, err
+	}
+}
+
+func (s Slurper) GetChannelInfo(channelID string) (*slack.Channel, error) {
 	for {
 		c, err := s.client.GetConversationInfo(&slack.GetConversationInfoInput{
 			ChannelID:         channelID,
@@ -968,7 +984,7 @@ func (s Slurper) getChannels(params *slack.GetConversationsParameters) ([]*slack
 				dmMap[c.User] = cPtr
 				userIds = append(userIds, c.User)
 			} else if c.IsGroup { // Apparently groups don't get the number of members populated when you call GetConversations
-				updatedChan, err := s.getChannelInfo(c.ID)
+				updatedChan, err := s.GetChannelInfo(c.ID)
 				if err == nil { // Update if no error
 					cPtr.NumMembers = updatedChan.NumMembers
 				}
@@ -1062,7 +1078,6 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 					NumMembers:       channel.NumMembers,
 					Created:          channel.Created,
 					ConnectedTeamIDs: channel.ConnectedTeamIDs,
-					SharedTeamIDs:    channel.SharedTeamIDs,
 					InternalTeamIDs:  channel.InternalTeamIDs,
 				}
 			}
