@@ -937,6 +937,21 @@ func (s Slurper) GetLatestMessage(channelID string) (*slack.Message, error) {
 	}
 }
 
+func (s Slurper) getChannelInfo(channelID string) (*slack.Channel, error) {
+	for {
+		c, err := s.client.GetConversationInfo(&slack.GetConversationInfoInput{
+			ChannelID:         channelID,
+			IncludeNumMembers: true,
+		})
+
+		if s.handleRateLimit(err) {
+			continue
+		}
+
+		return c, err
+	}
+}
+
 func (s Slurper) getChannels(params *slack.GetConversationsParameters) ([]*slack.Channel, string, error) {
 	for {
 		chans, cursor, err := s.client.GetConversations(params)
@@ -948,12 +963,18 @@ func (s Slurper) getChannels(params *slack.GetConversationsParameters) ([]*slack
 		dmMap := make(map[string]*slack.Channel)
 		var userIds []string
 		for _, c := range chans {
+			cPtr := &c
 			if c.IsIM {
-				dmMap[c.User] = &c
+				dmMap[c.User] = cPtr
 				userIds = append(userIds, c.User)
+			} else if c.IsGroup { // Apparently groups don't get the number of members populated when you call GetConversations
+				updatedChan, err := s.getChannelInfo(c.ID)
+				if err == nil { // Update if no error
+					cPtr.NumMembers = updatedChan.NumMembers
+				}
 			}
 
-			channels = append(channels, &c)
+			channels = append(channels, cPtr)
 		}
 
 		if len(userIds) != 0 {
