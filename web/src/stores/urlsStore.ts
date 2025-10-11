@@ -16,7 +16,6 @@ interface URLsState {
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
-  setDismissComplete: (value: boolean) => void
 }
 
 export const useURLsStore = create<URLsState>((set, get) => ({
@@ -83,7 +82,7 @@ export const useURLsStore = create<URLsState>((set, get) => ({
       wsManager.on('error', handleError)
       
       // Start the search
-      const response = await api.post('/urls/search', request)
+      const response = await api.post('/search/urls', request)
       const searchResponse: URLSearchResponse = response.data
       
       set({
@@ -111,7 +110,7 @@ export const useURLsStore = create<URLsState>((set, get) => ({
     const currentSearch = get().currentSearch
     if (currentSearch) {
       // Send stop request to backend
-      api.post(`/urls/stop/${currentSearch.search_id}`).catch(console.error)
+      api.post(`/search/stop/${currentSearch.search_id}`).catch(console.error)
     }
     
     set({
@@ -119,9 +118,5 @@ export const useURLsStore = create<URLsState>((set, get) => ({
       isLoading: false,
       currentSearch: null
     })
-  },
-
-  setDismissComplete: (value: boolean) => {
-    set({ dismissComplete: value })
   },
 }))

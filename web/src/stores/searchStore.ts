@@ -15,14 +15,21 @@ interface SearchState {
   currentSearch: SearchResponse | null
   dismissComplete: boolean
   searchType: 'messages' | 'files' | 'both'
+  isStopped: boolean
+  
+  // WebSocket handlers
+  messageHandler?: (data: MessageResult) => void
+  fileHandler?: (data: FileResult) => void
+  completeHandler?: () => void
+  errorHandler?: (data: any) => void
   
   // Actions
   search: (request: SearchRequest) => Promise<void>
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
-  setDismissComplete: (dismiss: boolean) => void
   setSearchType: (type: 'messages' | 'files' | 'both') => void
+  cleanupWebsocket: () => void
 }
 
 export const useSearchStore = create<SearchState>((set, get) => ({
@@ -34,9 +41,14 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   currentSearch: null,
   dismissComplete: false,
   searchType: 'both',
+  isStopped: false,
+  messageHandler: undefined,
+  fileHandler: undefined,
+  completeHandler: undefined,
+  errorHandler: undefined,
 
   search: async (request: SearchRequest) => {
-    set({ isLoading: true, error: null, isSearching: true, messages: [], files: [] })
+    set({ isLoading: true, error: null, isSearching: true, messages: [], files: [], isStopped: false })
     
     try {
       // Start WebSocket connection if not already connected
@@ -46,12 +58,18 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       
       // Set up WebSocket listeners
       const handleMessageResult = (data: MessageResult) => {
+        const state = get()
+        if (state.isStopped) return // Don't process messages if search is stopped
+        
         set(state => ({
           messages: [...state.messages, data]
         }))
       }
       
       const handleFileResult = (data: FileResult) => {
+        const state = get()
+        if (state.isStopped) return // Don't process messages if search is stopped
+        
         set(state => ({
           files: [...state.files, data]
         }))
@@ -69,10 +87,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('message_result', handleMessageResult)
-        wsManager.off('file_result', handleFileResult)
-        wsManager.off('complete', handleComplete)
-        wsManager.off('error', handleError)
+        const state = get()
+        state.cleanupWebsocket()
       }
       
       const handleError = (data: any) => {
@@ -83,13 +99,18 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('message_result', handleMessageResult)
-        wsManager.off('file_result', handleFileResult)
-        wsManager.off('complete', handleComplete)
-        wsManager.off('error', handleError)
+        const state = get()
+        state.cleanupWebsocket()
       }
       
-      // Add listeners
+      // Store handler references and add listeners
+      set({
+        messageHandler: handleMessageResult,
+        fileHandler: handleFileResult,
+        completeHandler: handleComplete,
+        errorHandler: handleError
+      })
+      
       wsManager.on('message_result', handleMessageResult)
       wsManager.on('file_result', handleFileResult)
       wsManager.on('complete', handleComplete)
@@ -122,12 +143,40 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   },
 
   stopSearch: () => {
-    set({ isSearching: false, isLoading: false })
-    // TODO: Implement actual search cancellation
+    const state = get()
+    const currentSearch = state.currentSearch
+    if (currentSearch) {
+      // Send stop request to backend
+      api.post(`/search/stop/${currentSearch.search_id}`).catch(console.error)
+    }
+    
+    // Set stopped flag to prevent processing any queued messages
+    set({ isStopped: true })
+
+    state.cleanupWebsocket()
+    
+    set({
+      isSearching: false,
+      isLoading: false,
+      currentSearch: null,
+    })
   },
 
-  setDismissComplete: (dismiss: boolean) => {
-    set({ dismissComplete: dismiss })
+  cleanupWebsocket() {
+    const state = get()
+
+    // Clean up all WebSocket listeners to stop processing messages
+    if (state.messageHandler) wsManager.off('message_result', state.messageHandler)
+    if (state.fileHandler) wsManager.off('file_result', state.fileHandler)
+    if (state.completeHandler) wsManager.off('complete', state.completeHandler)
+    if (state.errorHandler) wsManager.off('error', state.errorHandler)
+    
+    set({
+      messageHandler: undefined,
+      fileHandler: undefined,
+      completeHandler: undefined,
+      errorHandler: undefined
+    })
   },
 
   setSearchType: (type?: 'messages' | 'files' | 'both') => {

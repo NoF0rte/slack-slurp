@@ -26,7 +26,9 @@ type APIHandler struct {
 	// Context for cancelling channel loading operations
 	channelCtx    context.Context
 	channelCancel context.CancelFunc
-	channelMutex  sync.RWMutex
+
+	mu        sync.RWMutex
+	searchMap map[string]context.CancelFunc
 }
 
 type SearchFiltersRequest struct {
@@ -223,23 +225,23 @@ func (h *APIHandler) GetChannelsDetailed(c *gin.Context) {
 	}
 
 	// Cancel any existing channel loading operation
-	h.channelMutex.Lock()
+	h.mu.Lock()
 	if h.channelCancel != nil {
 		h.channelCancel()
 	}
 	// Create new context for this operation
 	h.channelCtx, h.channelCancel = context.WithCancel(context.Background())
-	h.channelMutex.Unlock()
+	h.mu.Unlock()
 
 	// Start async channels loading and processing
-	go h.runChannelsDetailed(types)
+	go h.runChannelsDetailed(h.channelCtx, types)
 
 	c.JSON(http.StatusOK, gin.H{"status": "started"})
 }
 
 func (h *APIHandler) StopChannelLoading(c *gin.Context) {
-	h.channelMutex.Lock()
-	defer h.channelMutex.Unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	if h.channelCancel != nil {
 		h.channelCancel()
@@ -259,6 +261,8 @@ func (h *APIHandler) GetUsers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, users)
 }
+
+// Search endpoints
 
 func (h *APIHandler) SearchDomains(c *gin.Context) {
 	var req struct {
@@ -283,24 +287,19 @@ func (h *APIHandler) SearchDomains(c *gin.Context) {
 
 	searchID := generateSearchID()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	h.mu.Lock()
+	h.searchMap[searchID] = cancel
+	h.mu.Unlock()
+
 	// Start async domain search
-	go h.runDomainSearch(searchID, req.Domains, searchOptions)
+	go h.runDomainSearch(ctx, searchID, req.Domains, searchOptions)
 
 	c.JSON(http.StatusOK, DomainSearchResponse{
 		SearchID:        searchID,
 		Status:          "started",
 		DomainsSearched: req.Domains,
-	})
-}
-
-func (h *APIHandler) StopDomainSearch(c *gin.Context) {
-	searchID := c.Param("id")
-
-	// TODO: Implement domain search cancellation
-	// For now, just return success
-	c.JSON(http.StatusOK, gin.H{
-		"search_id": searchID,
-		"status":    "cancelled",
 	})
 }
 
@@ -319,8 +318,14 @@ func (h *APIHandler) SearchURLs(c *gin.Context) {
 
 	searchID := generateSearchID()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	h.mu.Lock()
+	h.searchMap[searchID] = cancel
+	h.mu.Unlock()
+
 	// Start async url search
-	go h.runURLSearch(searchID, searchOptions)
+	go h.runURLSearch(ctx, searchID, searchOptions)
 
 	c.JSON(http.StatusOK, gin.H{
 		"search_id": searchID,
@@ -328,7 +333,6 @@ func (h *APIHandler) SearchURLs(c *gin.Context) {
 	})
 }
 
-// Search endpoints
 func (h *APIHandler) Search(c *gin.Context) {
 	var req SearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -348,13 +352,25 @@ func (h *APIHandler) Search(c *gin.Context) {
 
 	searchID := generateSearchID()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	h.mu.Lock()
+	h.searchMap[searchID] = cancel
+	h.mu.Unlock()
+
 	go func() {
+		defer func() {
+			h.mu.Lock()
+			delete(h.searchMap, searchID)
+			h.mu.Unlock()
+		}()
+
 		var err error
 		if req.SearchType == "messages" || req.SearchType == "both" {
-			err = h.runMessageSearch(searchID, req.Query, searchOptions)
+			err = h.runMessageSearch(ctx, searchID, req.Query, searchOptions)
 		}
 
-		if err != nil {
+		if err != nil && err != context.Canceled {
 			h.sendWebSocketMessage(WSMessage{
 				Type:     "error",
 				SearchID: searchID,
@@ -362,13 +378,19 @@ func (h *APIHandler) Search(c *gin.Context) {
 			})
 
 			return
+		} else if err == context.Canceled { // If canceled, we just want to send a complete message
+			h.sendWebSocketMessage(WSMessage{
+				Type:     "complete",
+				SearchID: searchID,
+			})
+			return
 		}
 
 		if req.SearchType == "files" || req.SearchType == "both" {
-			err = h.runFileSearch(searchID, req.Query, searchOptions)
+			err = h.runFileSearch(ctx, searchID, req.Query, searchOptions)
 		}
 
-		if err != nil {
+		if err != nil && err != context.Canceled {
 			h.sendWebSocketMessage(WSMessage{
 				Type:     "error",
 				SearchID: searchID,
@@ -389,9 +411,20 @@ func (h *APIHandler) Search(c *gin.Context) {
 	})
 }
 
-func (h *APIHandler) GetSearchHistory(c *gin.Context) {
-	// TODO: Implement search history storage
-	c.JSON(http.StatusOK, []interface{}{})
+func (h *APIHandler) StopSearch(c *gin.Context) {
+	searchID := c.Param("id")
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	cancel, ok := h.searchMap[searchID]
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "search not found"})
+	}
+
+	cancel()
+
+	c.JSON(http.StatusOK, gin.H{"status": "stopped"})
 }
 
 // Secret detection endpoints
@@ -476,16 +509,25 @@ func (h *APIHandler) runSecretScan(scanID string, req SecretScanRequest) {
 	// This is a placeholder for the async secret scanning logic
 }
 
-func (h *APIHandler) runDomainSearch(searchID string, domains []string, options []slurp.SearchOption) {
+func (h *APIHandler) runDomainSearch(ctx context.Context, searchID string, domains []string, options []slurp.SearchOption) {
+	defer func() {
+		h.mu.Lock()
+		delete(h.searchMap, searchID)
+		h.mu.Unlock()
+	}()
+
 	totalFound := 0
 
-	domainChan, errorChan := h.slurper.GetDomainsAsync(domains, options...)
+	domainChan, errorChan := h.slurper.GetDomainsAsyncWithContext(ctx, domains, options...)
 
 	var err error
 
 Loop:
 	for {
 		select {
+		case <-ctx.Done():
+			err = <-errorChan // The ctx.Err will be coming from the errorChan
+			break Loop
 		case domain, ok := <-domainChan:
 			if !ok {
 				break Loop
@@ -500,12 +542,12 @@ Loop:
 				},
 			})
 		case err = <-errorChan:
-			close(domainChan)
+			break Loop
 		}
 	}
 	close(errorChan)
 
-	if err != nil {
+	if err != nil && err != context.Canceled {
 		h.sendWebSocketMessage(WSMessage{
 			Type:     "error",
 			SearchID: searchID,
@@ -526,8 +568,14 @@ Loop:
 	})
 }
 
-func (h *APIHandler) runURLSearch(searchID string, options []slurp.SearchOption) {
-	urlChan, errorChan := h.slurper.GetURLsAsync(options...)
+func (h *APIHandler) runURLSearch(ctx context.Context, searchID string, options []slurp.SearchOption) {
+	defer func() {
+		h.mu.Lock()
+		delete(h.searchMap, searchID)
+		h.mu.Unlock()
+	}()
+
+	urlChan, errorChan := h.slurper.GetURLsAsyncWithContext(ctx, options...)
 
 	totalFound := 0
 
@@ -536,6 +584,9 @@ func (h *APIHandler) runURLSearch(searchID string, options []slurp.SearchOption)
 Loop:
 	for {
 		select {
+		case <-ctx.Done():
+			err = <-errorChan // The ctx.Err will be coming from the errorChan
+			break Loop
 		case u, ok := <-urlChan:
 			if !ok {
 				break Loop
@@ -548,12 +599,12 @@ Loop:
 				Data:     u,
 			})
 		case err = <-errorChan:
-			close(urlChan)
+			break Loop
 		}
 	}
 	close(errorChan)
 
-	if err != nil {
+	if err != nil && err != context.Canceled {
 		h.sendWebSocketMessage(WSMessage{
 			Type:     "error",
 			SearchID: searchID,
@@ -573,11 +624,7 @@ Loop:
 	})
 }
 
-func (h *APIHandler) runChannelsDetailed(types []slurp.ChannelType) {
-	h.channelMutex.RLock()
-	ctx := h.channelCtx
-	h.channelMutex.RUnlock()
-
+func (h *APIHandler) runChannelsDetailed(ctx context.Context, types []slurp.ChannelType) {
 	// Use a worker pool with 10 goroutines for concurrent processing
 	const numWorkers = 10
 	resultChan := make(chan slurp.Channel, numWorkers)
@@ -691,22 +738,17 @@ func (h *APIHandler) runChannelsDetailed(types []slurp.ChannelType) {
 	}
 }
 
-func (h *APIHandler) sendWebSocketMessage(message WSMessage) {
-	data, err := json.Marshal(message)
-	if err != nil {
-		return
-	}
-	h.hub.BroadcastToType("dashboard", data)
-}
-
-func (h *APIHandler) runMessageSearch(searchID string, query string, options []slurp.SearchOption) error {
-	messageChan, errorChan := h.slurper.SearchMessagesAsync(query, options...)
+func (h *APIHandler) runMessageSearch(ctx context.Context, searchID string, query string, options []slurp.SearchOption) error {
+	messageChan, errorChan := h.slurper.SearchMessagesAsyncWithContext(ctx, query, options...)
 
 	var err error
 
 Loop:
 	for {
 		select {
+		case <-ctx.Done():
+			err = <-errorChan // The ctx.Err will be coming from the errorChan
+			break Loop
 		case message, ok := <-messageChan:
 			if !ok {
 				break Loop
@@ -724,7 +766,7 @@ Loop:
 				},
 			})
 		case err = <-errorChan:
-			close(messageChan)
+			break Loop
 		}
 	}
 	close(errorChan)
@@ -736,14 +778,17 @@ Loop:
 	return nil
 }
 
-func (h *APIHandler) runFileSearch(searchID string, query string, options []slurp.SearchOption) error {
-	fileChan, errorChan := h.slurper.SearchFilesAsync(query, options...)
+func (h *APIHandler) runFileSearch(ctx context.Context, searchID string, query string, options []slurp.SearchOption) error {
+	fileChan, errorChan := h.slurper.SearchFilesAsyncWithContext(ctx, query, options...)
 
 	var err error
 
 Loop:
 	for {
 		select {
+		case <-ctx.Done():
+			err = <-errorChan // The ctx.Err will be coming from the errorChan
+			break Loop
 		case file, ok := <-fileChan:
 			if !ok {
 				break Loop
@@ -762,7 +807,7 @@ Loop:
 				},
 			})
 		case err = <-errorChan:
-			close(fileChan)
+			break Loop
 		}
 	}
 	close(errorChan)
@@ -772,4 +817,12 @@ Loop:
 	}
 
 	return nil
+}
+
+func (h *APIHandler) sendWebSocketMessage(message WSMessage) {
+	data, err := json.Marshal(message)
+	if err != nil {
+		return
+	}
+	h.hub.BroadcastToType("dashboard", data)
 }

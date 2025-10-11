@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/gin-gonic/gin"
@@ -10,9 +12,10 @@ import (
 func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub *websocket.Hub) {
 	// Create API handler
 	handler := &APIHandler{
-		slurper: slurper,
-		config:  config,
-		hub:     hub,
+		slurper:   slurper,
+		config:    config,
+		hub:       hub,
+		searchMap: make(map[string]context.CancelFunc),
 	}
 
 	// API routes
@@ -32,11 +35,10 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		api.GET("/users", handler.GetUsers)
 
 		// Search Operations
-		api.POST("/domains/search", handler.SearchDomains)
-		api.POST("/domains/stop/:id", handler.StopDomainSearch)
-		api.POST("/urls/search", handler.SearchURLs)
+		api.POST("/search/domains", handler.SearchDomains)
+		api.POST("/search/urls", handler.SearchURLs)
 		api.POST("/search", handler.Search)
-		api.GET("/search/history", handler.GetSearchHistory)
+		api.POST("/search/stop/:id", handler.StopSearch)
 
 		// Secret Detection
 		api.POST("/secrets/scan", handler.StartSecretScan)

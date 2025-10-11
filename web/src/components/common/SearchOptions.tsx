@@ -38,7 +38,7 @@ export function SearchOptions({
     if (users.length === 0) {
       fetchUsers()
     }
-  }, [channels.length, users.length, fetchChannels, fetchUsers])
+  }, [fetchChannels, fetchUsers])
 
   // Prepare options for dropdowns
   const channelOptions = channels

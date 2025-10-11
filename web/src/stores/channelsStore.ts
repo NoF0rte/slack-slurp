@@ -100,11 +100,6 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
 
   stopLoading: () => {
     api.post(`/channels/detailed/stop`).catch(console.error)
-    
-    set({
-      isLoading: false,
-      isAsyncLoading: false,
-    })
   },
 
   syncToSearchCache: () => {

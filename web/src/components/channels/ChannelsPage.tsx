@@ -41,10 +41,10 @@ export function ChannelsPage() {
 
   // Sync to search cache when channels are loaded and we have all types
   useEffect(() => {
-    if (!isAsyncLoading && channels.length > 0 && selectedType === 'all') {
+    if (!isAsyncLoading && !error && channels.length > 0 && selectedType === 'all') {
       syncToSearchCache()
     }
-  }, [channels.length, isAsyncLoading, selectedType, syncToSearchCache])
+  }, [isAsyncLoading, selectedType, syncToSearchCache])
 
   const filteredChannels = channels.filter(channel => {
     if (!searchQuery) return true

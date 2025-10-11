@@ -16,7 +16,6 @@ interface DomainsState {
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
-  setDismissComplete: (value: boolean) => void
 }
 
 export const useDomainsStore = create<DomainsState>((set, get) => ({
@@ -89,7 +88,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       wsManager.on('error', handleError)
       
       // Start the search
-      const response = await api.post('/domains/search', request)
+      const response = await api.post('/search/domains', request)
       const searchResponse: DomainSearchResponse = response.data
       
       set({
@@ -117,7 +116,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
     const currentSearch = get().currentSearch
     if (currentSearch) {
       // Send stop request to backend
-      api.post(`/domains/stop/${currentSearch.search_id}`).catch(console.error)
+      api.post(`/search/stop/${currentSearch.search_id}`).catch(console.error)
     }
     
     set({
@@ -125,9 +124,5 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       isLoading: false,
       currentSearch: null
     })
-  },
-
-  setDismissComplete: (value: boolean) => {
-    set({ dismissComplete: value })
   },
 }))

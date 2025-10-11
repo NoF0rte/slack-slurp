@@ -15,14 +15,14 @@ export function MessageCard({ message, highlightText, searchTerm }: MessageCardP
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 hover:border-gray-600 transition-colors">
-      <div className="flex items-start space-x-3">
+    <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 hover:border-gray-600 transition-colors w-full max-w-full">
+      <div className="flex items-start space-x-3 w-full">
         <div className="flex-shrink-0">
           <UserIcon className="w-6 h-6 text-gray-400" />
         </div>
         
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-2">
+        <div className="flex-1 min-w-0 w-full overflow-hidden">
+          <div className="flex items-center space-x-2 mb-2 flex-wrap">
             <span className="text-sm font-medium text-white">
               @{message.user}
             </span>
@@ -38,7 +38,7 @@ export function MessageCard({ message, highlightText, searchTerm }: MessageCardP
             </div>
           </div>
           
-          <div className="text-gray-300 whitespace-pre-wrap break-words">
+          <div className="text-gray-300 whitespace-pre-wrap break-words overflow-wrap-anywhere hyphens-auto w-full">
             {highlightText ? highlightText(message.text, searchTerm) : message.text}
           </div>
         </div>

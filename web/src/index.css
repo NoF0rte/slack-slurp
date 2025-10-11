@@ -19,6 +19,19 @@
     background-color: var(--color-slack-dark);
     color: #ffffff;
   }
+  
+  /* Ensure proper word wrapping for all text content */
+  * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  
+  /* Prevent horizontal overflow */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
 }
 
 @layer components {
