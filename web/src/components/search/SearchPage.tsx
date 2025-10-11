@@ -366,7 +366,7 @@ export function SearchPage() {
         <button
           onClick={handleSearch}
           disabled={isSearching || !searchQuery.trim()}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isSearching ? (
             <ArrowPathIcon className="w-4 h-4 animate-spin" />

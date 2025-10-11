@@ -150,6 +150,7 @@ export interface FileResult {
   created: string
   channels: string[]
   filetype: string
+  size: number
   user: string
 }
 

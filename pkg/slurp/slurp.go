@@ -55,6 +55,7 @@ type File struct {
 	URL      string     `json:"url"`
 	Filetype string     `json:"filetype"`
 	User     string     `json:"user"`
+	Size     int        `json:"size"`
 	Raw      slack.File `json:"-"`
 }
 
@@ -639,6 +640,7 @@ func (s Slurper) SearchFilesAsyncWithContext(ctx context.Context, query string, 
 						Channels: channels,
 						URL:      url,
 						Filetype: match.Filetype,
+						Size:     match.Size,
 						User:     user,
 						Raw:      match,
 					}:

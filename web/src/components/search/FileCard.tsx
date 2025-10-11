@@ -140,6 +140,16 @@ export function FileCard({ file, highlightText, searchTerm }: FileCardProps) {
     return date.toLocaleString()
   }
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B'
+    
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  }
+
   const fileTypeInfo = getFileTypeInfo(file.filetype)
   const IconComponent = fileTypeInfo.icon
 
@@ -180,6 +190,11 @@ export function FileCard({ file, highlightText, searchTerm }: FileCardProps) {
               <CalendarIcon className="w-4 h-4" />
               <span>{formatDate(file.created)}</span>
             </div>
+            
+            <span className="text-gray-500">•</span>
+            <span className="text-xs text-gray-400">
+              {formatFileSize(file.size)}
+            </span>
             
             <span className="text-gray-500">•</span>
             <span className={`text-xs px-2 py-1 rounded ${fileTypeInfo.bgColor} ${fileTypeInfo.color}`}>

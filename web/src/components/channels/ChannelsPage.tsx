@@ -182,6 +182,7 @@ export function ChannelsPage() {
             </label>
             <select
               value={selectedType}
+              disabled={isLoading || isAsyncLoading}
               onChange={(e) => setSelectedType(e.target.value as ChannelType)}
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >

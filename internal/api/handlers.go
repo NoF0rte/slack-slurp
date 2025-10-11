@@ -117,6 +117,7 @@ type FileResult struct {
 	Created  time.Time `json:"created"`
 	Channels []string  `json:"channels"`
 	Filetype string    `json:"filetype"`
+	Size     int       `json:"size"`
 	User     string    `json:"user"`
 }
 
@@ -803,6 +804,7 @@ Loop:
 					Created:  file.Created,
 					Channels: file.Channels,
 					Filetype: file.Filetype,
+					Size:     file.Size,
 					User:     file.User,
 				},
 			})
