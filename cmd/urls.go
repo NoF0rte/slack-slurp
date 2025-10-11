@@ -70,7 +70,7 @@ var urlsCmd = &cobra.Command{
 
 				fmt.Fprintln(writer, u)
 			case err = <-errorChan:
-				close(urlChan)
+				break Loop
 			}
 		}
 		close(errorChan)

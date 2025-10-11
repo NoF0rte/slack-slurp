@@ -189,8 +189,6 @@ func (h *APIHandler) GetChannels(c *gin.Context) {
 	t := slurp.ChannelType(c.Query("type"))
 	types := []slurp.ChannelType{t}
 
-	withLatest := c.Query("latest") == "true"
-
 	if t == "" {
 		// Default to all types
 		types = []slurp.ChannelType{
@@ -207,9 +205,21 @@ func (h *APIHandler) GetChannels(c *gin.Context) {
 		return
 	}
 
-	if !withLatest {
-		c.JSON(http.StatusOK, channels)
-		return
+	c.JSON(http.StatusOK, channels)
+}
+
+func (h *APIHandler) GetChannelsDetailed(c *gin.Context) {
+	t := slurp.ChannelType(c.Query("type"))
+	types := []slurp.ChannelType{t}
+
+	if t == "" {
+		// Default to all types
+		types = []slurp.ChannelType{
+			slurp.ChannelPublic,
+			slurp.ChannelPrivate,
+			slurp.ChannelDirectMessage,
+			slurp.ChannelGroupMessage,
+		}
 	}
 
 	// Cancel any existing channel loading operation
@@ -221,8 +231,8 @@ func (h *APIHandler) GetChannels(c *gin.Context) {
 	h.channelCtx, h.channelCancel = context.WithCancel(context.Background())
 	h.channelMutex.Unlock()
 
-	// Start async channels activity search with concurrent processing
-	go h.runChannelLatest(channels)
+	// Start async channels loading and processing
+	go h.runChannelsDetailed(types)
 
 	c.JSON(http.StatusOK, gin.H{"status": "started"})
 }
@@ -563,16 +573,16 @@ Loop:
 	})
 }
 
-func (h *APIHandler) runChannelLatest(channels []slurp.Channel) {
+func (h *APIHandler) runChannelsDetailed(types []slurp.ChannelType) {
 	h.channelMutex.RLock()
 	ctx := h.channelCtx
 	h.channelMutex.RUnlock()
 
 	// Use a worker pool with 10 goroutines for concurrent processing
 	const numWorkers = 10
-	channelChan := make(chan slurp.Channel, len(channels))
-	resultChan := make(chan slurp.Channel, len(channels))
-	errorChan := make(chan error, numWorkers)
+	resultChan := make(chan slurp.Channel, numWorkers)
+
+	channelChan, errorChan := h.slurper.GetChannelsAsyncWithContext(ctx, types...)
 
 	var wg sync.WaitGroup
 
@@ -637,18 +647,6 @@ func (h *APIHandler) runChannelLatest(channels []slurp.Channel) {
 			}
 		}()
 	}
-
-	// Send channels to workers
-	go func() {
-		defer close(channelChan)
-		for _, channel := range channels {
-			select {
-			case channelChan <- channel:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
 
 	// Wait for workers to complete
 	go func() {

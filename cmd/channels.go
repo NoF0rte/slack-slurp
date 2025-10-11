@@ -77,7 +77,7 @@ var channelsCmd = &cobra.Command{
 				bytes, _ := json.MarshalIndent(channel, "", "  ")
 				fmt.Fprintln(writer, string(bytes))
 			case channelErr = <-errorChan:
-				close(channelChan)
+				break Loop
 			}
 		}
 		close(errorChan)

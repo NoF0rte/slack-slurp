@@ -74,7 +74,7 @@ var secretsCmd = &cobra.Command{
 
 				fmt.Fprintln(writer, output)
 			case err = <-errorChan:
-				close(secretChan)
+				break Loop
 			}
 		}
 		close(errorChan)

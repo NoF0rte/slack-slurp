@@ -10,7 +10,7 @@ interface ChannelsState {
   isLoading: boolean
   isAsyncLoading: boolean
   error: string | null
-  fetchChannels: (withActivity: boolean, types?: string[]) => Promise<void>
+  fetchChannels: (types?: string[]) => Promise<void>
   setSelectedType: (channelType: ChannelType) => void
   clearError: () => void
   stopLoading: () => void
@@ -24,15 +24,13 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   isAsyncLoading: false,
   error: null,
   
-  fetchChannels: async (withLatest: boolean, types?: string[]) => {
+  fetchChannels: async (types?: string[]) => {
     // Prevent duplicate async loading
     const state = get()
-    if (withLatest) {
-      if (state.isAsyncLoading) {
-        return // Already loading asynchronously, don't start another load
-      }
+    if (state.isAsyncLoading) {
+      return // Already loading asynchronously, don't start another load
     }
-    
+
     set({ isLoading: true, error: null })
     
     try {
@@ -41,65 +39,51 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
         types.forEach(type => params.append('type', type))
       }
 
-      if (withLatest) {
-        params.append("latest", "true")
+      set({ isLoading: false, isAsyncLoading: true, channels: [] })
 
-        set({ isLoading: false, isAsyncLoading: true, channels: [] })
-
-        // Start WebSocket connection if not already connected
-        if (!wsManager.isConnected()) {
-          await wsManager.connect()
-        }
-        
-        // Set up WebSocket listeners
-        const handleChannelResult = (data: Channel) => {
-          set(state => ({
-            channels: [...state.channels, data]
-          }))
-        }
-        
-        const handleComplete = () => {
-          set({
-            isLoading: false,
-            isAsyncLoading: false,
-          })
-          
-          // Clean up listeners
-          wsManager.off('channel_result', handleChannelResult)
-          wsManager.off('complete', handleComplete)
-          wsManager.off('error', handleError)
-        }
-        
-        const handleError = (data: any) => {
-          set({
-            error: data.message || 'Channel loading failed',
-            isLoading: false,
-            isAsyncLoading: false,
-          })
-          
-          // Clean up listeners
-          wsManager.off('channel_result', handleChannelResult)
-          wsManager.off('complete', handleComplete)
-          wsManager.off('error', handleError)
-        }
-        
-        // Add listeners
-        wsManager.on('channel_result', handleChannelResult)
-        wsManager.on('complete', handleComplete)
-        wsManager.on('error', handleError)
+      // Start WebSocket connection if not already connected
+      if (!wsManager.isConnected()) {
+        await wsManager.connect()
       }
       
-      let response = await api.get(`/channels?${params.toString()}`)
-
-      if (withLatest) {
-        return
+      // Set up WebSocket listeners
+      const handleChannelResult = (data: Channel) => {
+        set(state => ({
+          channels: [...state.channels, data]
+        }))
       }
-
-      set({ 
-        channels: response.data,
-        isLoading: false,
-        error: null,
-      })
+      
+      const handleComplete = () => {
+        set({
+          isLoading: false,
+          isAsyncLoading: false,
+        })
+        
+        // Clean up listeners
+        wsManager.off('channel_result', handleChannelResult)
+        wsManager.off('complete', handleComplete)
+        wsManager.off('error', handleError)
+      }
+      
+      const handleError = (data: any) => {
+        set({
+          error: data.message || 'Channel loading failed',
+          isLoading: false,
+          isAsyncLoading: false,
+        })
+        
+        // Clean up listeners
+        wsManager.off('channel_result', handleChannelResult)
+        wsManager.off('complete', handleComplete)
+        wsManager.off('error', handleError)
+      }
+      
+      // Add listeners
+      wsManager.on('channel_result', handleChannelResult)
+      wsManager.on('complete', handleComplete)
+      wsManager.on('error', handleError)
+      
+      await api.get(`/channels/detailed?${params.toString()}`)
     } catch (error: any) {
       set({ 
         error: error.response?.data?.error || error.message,
@@ -115,7 +99,7 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   clearError: () => set({ error: null }),
 
   stopLoading: () => {
-    api.post(`/channels/stop`).catch(console.error)
+    api.post(`/channels/detailed/stop`).catch(console.error)
     
     set({
       isLoading: false,

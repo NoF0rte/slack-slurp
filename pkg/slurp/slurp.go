@@ -282,7 +282,7 @@ Loop:
 			}
 			messages = append(messages, message)
 		case err = <-errorChan:
-			close(messageChan)
+			break Loop
 		}
 	}
 	close(errorChan)
@@ -340,8 +340,14 @@ func (s Slurper) searchMessages(query string, params slack.SearchParameters) (*s
 // SearchMessagesAsync will search Slack messages for the specified query asynchronously using channels.
 // Slack's query syntax can be used here.
 func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (chan Message, chan error) {
+	return s.SearchMessagesAsyncWithContext(context.Background(), query, options...)
+}
+
+// SearchMessagesAsyncWithContext will search Slack messages for the specified query asynchronously using channels.
+// Slack's query syntax can be used here.
+func (s Slurper) SearchMessagesAsyncWithContext(ctx context.Context, query string, options ...SearchOption) (chan Message, chan error) {
 	messageChan := make(chan Message)
-	errorChan := make(chan error)
+	errorChan := make(chan error, 1) // Buffered to prevent blocking
 
 	if len(options) != 0 {
 		for _, option := range options {
@@ -350,14 +356,32 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 	}
 
 	go func() {
+		defer close(messageChan)
+
 		var wg sync.WaitGroup
 		var mu sync.Mutex
+		var hasError bool
 
 		var current int
 		count, err := s.getPageCount(query, "messages")
 		if err != nil {
-			errorChan <- err
+			select {
+			case errorChan <- err:
+			case <-ctx.Done():
+			}
 			return
+		}
+
+		sendErr := func(err error) {
+			mu.Lock()
+			if !hasError {
+				hasError = true
+				select {
+				case errorChan <- err:
+				default:
+				}
+			}
+			mu.Unlock()
 		}
 
 		action := func(startingPage int) {
@@ -367,13 +391,29 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 			params.Count = 100 // Ensure we get the most results to reduce rate limiting
 
 			for {
+				// Check for cancellation before each API call
+				select {
+				case <-ctx.Done():
+					sendErr(ctx.Err())
+					return
+				default:
+				}
+
 				search, err := s.searchMessages(query, params)
 				if err != nil {
-					errorChan <- err
+					sendErr(err)
 					return
 				}
 
 				for _, match := range search.Matches {
+					// Check for cancellation before processing each message
+					select {
+					case <-ctx.Done():
+						sendErr(ctx.Err())
+						return
+					default:
+					}
+
 					seconds, _ := strconv.ParseInt(strings.Split(match.Timestamp, ".")[0], 10, 64)
 					date := time.Unix(seconds, 0)
 
@@ -390,12 +430,18 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 						}
 					}
 
-					messageChan <- Message{
+					// Non-blocking send
+					select {
+					case messageChan <- Message{
 						User:    match.Username,
 						Date:    date,
 						Channel: channel,
 						Text:    match.Text,
 						Raw:     match,
+					}:
+					case <-ctx.Done():
+						sendErr(ctx.Err())
+						return
 					}
 				}
 
@@ -429,8 +475,6 @@ func (s Slurper) SearchMessagesAsync(query string, options ...SearchOption) (cha
 		}
 
 		wg.Wait()
-
-		close(messageChan)
 	}()
 
 	return messageChan, errorChan
@@ -464,7 +508,7 @@ Loop:
 			}
 			files = append(files, file)
 		case err = <-errorChan:
-			close(fileChan)
+			break Loop
 		}
 	}
 	close(errorChan)
@@ -485,6 +529,8 @@ func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan F
 	}
 
 	go func() {
+		defer close(fileChan)
+
 		var wg sync.WaitGroup
 		var mu sync.Mutex
 
@@ -589,8 +635,6 @@ func (s Slurper) SearchFilesAsync(query string, options ...SearchOption) (chan F
 		}
 
 		wg.Wait()
-
-		close(fileChan)
 	}()
 
 	return fileChan, errorChan
@@ -658,7 +702,7 @@ Loop:
 			}
 			allSecrets = append(allSecrets, secret)
 		case err = <-errorChan:
-			close(secretChan)
+			break Loop
 		}
 	}
 	close(errorChan)
@@ -682,6 +726,8 @@ func (s Slurper) GetSecretsAsync(opts ...SecretOption) (chan SecretResult, chan 
 	}
 
 	go func() {
+		defer close(secretChan)
+
 		nonStarSearchableRe := regexp.MustCompile(`(-|\.|_)$`)
 		for _, detector := range selectedDetectors {
 			var err error
@@ -732,7 +778,7 @@ func (s Slurper) GetSecretsAsync(opts ...SecretOption) (chan SecretResult, chan 
 							Secrets: secrets,
 						}
 					case err = <-err2Chan:
-						close(messageChan)
+						break Loop
 					}
 				}
 				close(err2Chan)
@@ -743,8 +789,6 @@ func (s Slurper) GetSecretsAsync(opts ...SecretOption) (chan SecretResult, chan 
 				}
 			}
 		}
-
-		close(secretChan)
 	}()
 
 	return secretChan, errorChan
@@ -785,6 +829,8 @@ func (s Slurper) GetDomainsAsync(domains []string, options ...SearchOption) (cha
 	}
 
 	go func() {
+		defer close(domainChan)
+
 		domainSet := treeset.NewWithStringComparator()
 		for _, domain := range selectedDomains {
 			var err error
@@ -825,7 +871,7 @@ func (s Slurper) GetDomainsAsync(domains []string, options ...SearchOption) (cha
 						domainChan <- match
 					}
 				case err = <-err2Chan:
-					close(messageChan)
+					break Loop
 				}
 			}
 			close(err2Chan)
@@ -835,8 +881,6 @@ func (s Slurper) GetDomainsAsync(domains []string, options ...SearchOption) (cha
 				return
 			}
 		}
-
-		close(domainChan)
 	}()
 
 	return domainChan, errorChan
@@ -867,19 +911,35 @@ Loop:
 }
 
 func (s Slurper) GetURLsAsync(options ...SearchOption) (chan string, chan error) {
+	return s.GetURLsAsyncWithContext(context.Background(), options...)
+}
+
+func (s Slurper) GetURLsAsyncWithContext(ctx context.Context, options ...SearchOption) (chan string, chan error) {
 	urlChan := make(chan string)
 	errorChan := make(chan error)
 
 	keywords := []string{"http://", "https://"}
 	go func() {
+		defer close(urlChan)
+
 		urlSet := treeset.NewWithStringComparator()
 		for _, keyword := range keywords {
-			var err error
-			messageChan, err2Chan := s.SearchMessagesAsync(keyword, options...)
+			// Check for cancellation before processing each keyword
+			select {
+			case <-ctx.Done():
+				errorChan <- ctx.Err()
+				return
+			default:
+			}
+
+			messageChan, err2Chan := s.SearchMessagesAsyncWithContext(ctx, keyword, options...)
 
 		Loop:
 			for {
 				select {
+				case <-ctx.Done():
+					errorChan <- ctx.Err()
+					return
 				case message, ok := <-messageChan:
 					if !ok {
 						break Loop
@@ -892,21 +952,24 @@ func (s Slurper) GetURLsAsync(options ...SearchOption) (chan string, chan error)
 						}
 
 						urlSet.Add(match)
-						urlChan <- match
+
+						// Non-blocking send
+						select {
+						case urlChan <- match:
+						case <-ctx.Done():
+							errorChan <- ctx.Err()
+							return
+						}
 					}
-				case err = <-err2Chan:
-					close(messageChan)
+				case err := <-err2Chan:
+					if err != nil {
+						errorChan <- err
+					}
+
+					return
 				}
 			}
-			close(err2Chan)
-
-			if err != nil {
-				errorChan <- err
-				return
-			}
 		}
-
-		close(urlChan)
 	}()
 
 	return urlChan, errorChan
@@ -1033,7 +1096,7 @@ Loop:
 			}
 			channels = append(channels, channel)
 		case err = <-errorChan:
-			close(channelChan)
+			break Loop
 		}
 	}
 	close(errorChan)
@@ -1043,6 +1106,11 @@ Loop:
 
 // GetChannelsAsync returns all channels in the current workspace of the specified type asynchronously using channels. If no channel type is supplied, the API defaults to returning public channels.
 func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, chan error) {
+	return s.GetChannelsAsyncWithContext(context.Background(), channelTypes...)
+}
+
+// GetChannelsAsyncWithContext returns all channels in the current workspace of the specified type asynchronously using channels with context support for cancellation.
+func (s Slurper) GetChannelsAsyncWithContext(ctx context.Context, channelTypes ...ChannelType) (chan Channel, chan error) {
 	channelChan := make(chan Channel)
 	errorChan := make(chan error)
 
@@ -1052,12 +1120,22 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 	}
 
 	go func() {
+		defer close(channelChan)
+
 		params := &slack.GetConversationsParameters{
 			Types: types,
 			Limit: 999, // Get as much as we can in one request to avoid rate limiting as much as we can
 		}
 
 		for {
+			// Check for cancellation before each API call
+			select {
+			case <-ctx.Done():
+				errorChan <- ctx.Err()
+				return
+			default:
+			}
+
 			channels, cursor, err := s.getChannels(params)
 			if err != nil {
 				errorChan <- err
@@ -1065,7 +1143,12 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 			}
 
 			for _, channel := range channels {
-				channelChan <- Channel{
+				// Check for cancellation before sending each channel
+				select {
+				case <-ctx.Done():
+					errorChan <- ctx.Err()
+					return
+				case channelChan <- Channel{
 					ID:               channel.ID,
 					Name:             channel.Name,
 					Topic:            channel.Topic.Value,
@@ -1079,6 +1162,7 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 					Created:          channel.Created,
 					ConnectedTeamIDs: channel.ConnectedTeamIDs,
 					InternalTeamIDs:  channel.InternalTeamIDs,
+				}:
 				}
 			}
 
@@ -1088,8 +1172,6 @@ func (s Slurper) GetChannelsAsync(channelTypes ...ChannelType) (chan Channel, ch
 
 			params.Cursor = cursor
 		}
-
-		close(channelChan)
 	}()
 
 	return channelChan, errorChan

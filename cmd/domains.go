@@ -72,7 +72,7 @@ var domainsCmd = &cobra.Command{
 
 				fmt.Fprintln(writer, domain)
 			case err = <-errorChan:
-				close(domainChan)
+				break Loop
 			}
 		}
 		close(errorChan)

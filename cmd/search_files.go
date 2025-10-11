@@ -40,7 +40,7 @@ var searchFilesCmd = &cobra.Command{
 				fmt.Println()
 
 			case err = <-errorChan:
-				close(fileChan)
+				break Loop
 			}
 		}
 		close(errorChan)

@@ -32,7 +32,7 @@ var messagesCmd = &cobra.Command{
 				fmt.Println()
 
 			case err = <-errorChan:
-				close(messageChan)
+				break Loop
 			}
 		}
 		close(errorChan)

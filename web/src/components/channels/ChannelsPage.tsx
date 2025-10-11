@@ -33,7 +33,7 @@ export function ChannelsPage() {
   useEffect(() => {
     if (initialized || channels.length === 0) {
       const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
-      fetchChannels(true, types)
+      fetchChannels(types)
     }
 
     setInitialized(true)
@@ -89,7 +89,7 @@ export function ChannelsPage() {
 
   const handleRefresh = () => {
     const types = channelTypeOptions.find(opt => opt.value === selectedType)?.types
-    fetchChannels(true, types)
+    fetchChannels(types)
   }
 
   const handleExportChannels = () => {
