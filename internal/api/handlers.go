@@ -122,10 +122,9 @@ type FileResult struct {
 }
 
 type WSMessage struct {
-	Type     string      `json:"type"` // "connected", "error", "complete", "domain_result", "url_result", "message_result", "file_result"
-	Data     interface{} `json:"data"`
-	ScanID   string      `json:"scan_id,omitempty"`
-	SearchID string      `json:"search_id,omitempty"`
+	ID   string      `json:"id,omitempty"`
+	Type string      `json:"type"` // "connected", "error", "complete", "domain_result", "url_result", "message_result", "file_result"
+	Data interface{} `json:"data"`
 }
 
 // Authentication endpoints
@@ -373,16 +372,16 @@ func (h *APIHandler) Search(c *gin.Context) {
 
 		if err != nil && err != context.Canceled {
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "error",
-				SearchID: searchID,
-				Data:     map[string]string{"message": "Message search error: " + err.Error()},
+				Type: "error",
+				ID:   searchID,
+				Data: map[string]string{"message": "Message search error: " + err.Error()},
 			})
 
 			return
 		} else if err == context.Canceled { // If canceled, we just want to send a complete message
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "complete",
-				SearchID: searchID,
+				Type: "complete",
+				ID:   searchID,
 			})
 			return
 		}
@@ -393,16 +392,16 @@ func (h *APIHandler) Search(c *gin.Context) {
 
 		if err != nil && err != context.Canceled {
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "error",
-				SearchID: searchID,
-				Data:     map[string]string{"message": "File search error: " + err.Error()},
+				Type: "error",
+				ID:   searchID,
+				Data: map[string]string{"message": "File search error: " + err.Error()},
 			})
 			return
 		}
 
 		h.sendWebSocketMessage(WSMessage{
-			Type:     "complete",
-			SearchID: searchID,
+			Type: "complete",
+			ID:   searchID,
 		})
 	}()
 
@@ -536,8 +535,8 @@ Loop:
 			totalFound++
 
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "domain_result",
-				SearchID: searchID,
+				Type: "domain_result",
+				ID:   searchID,
 				Data: DomainResult{
 					Domain: domain,
 				},
@@ -550,9 +549,9 @@ Loop:
 
 	if err != nil && err != context.Canceled {
 		h.sendWebSocketMessage(WSMessage{
-			Type:     "error",
-			SearchID: searchID,
-			Data:     map[string]string{"message": "Search error: " + err.Error()},
+			Type: "error",
+			ID:   searchID,
+			Data: map[string]string{"message": "Search error: " + err.Error()},
 		})
 
 		return
@@ -560,8 +559,8 @@ Loop:
 
 	// Send completion message
 	h.sendWebSocketMessage(WSMessage{
-		Type:     "complete",
-		SearchID: searchID,
+		Type: "complete",
+		ID:   searchID,
 		Data: map[string]interface{}{
 			"total_found":      totalFound,
 			"domains_searched": domains,
@@ -595,9 +594,9 @@ Loop:
 			totalFound++
 
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "url_result",
-				SearchID: searchID,
-				Data:     u,
+				Type: "url_result",
+				ID:   searchID,
+				Data: u,
 			})
 		case err = <-errorChan:
 			break Loop
@@ -607,9 +606,9 @@ Loop:
 
 	if err != nil && err != context.Canceled {
 		h.sendWebSocketMessage(WSMessage{
-			Type:     "error",
-			SearchID: searchID,
-			Data:     map[string]string{"message": "Search error: " + err.Error()},
+			Type: "error",
+			ID:   searchID,
+			Data: map[string]string{"message": "Search error: " + err.Error()},
 		})
 
 		return
@@ -617,8 +616,8 @@ Loop:
 
 	// Send completion message
 	h.sendWebSocketMessage(WSMessage{
-		Type:     "complete",
-		SearchID: searchID,
+		Type: "complete",
+		ID:   searchID,
 		Data: map[string]interface{}{
 			"total_found": totalFound,
 		},
@@ -710,12 +709,14 @@ func (h *APIHandler) runChannelsDetailed(ctx context.Context, types []slurp.Chan
 			if !ok {
 				// All results processed
 				h.sendWebSocketMessage(WSMessage{
+					ID:   "channel",
 					Type: "complete",
 				})
 				return
 			}
 
 			h.sendWebSocketMessage(WSMessage{
+				ID:   "channel",
 				Type: "channel_result",
 				Data: channel,
 			})
@@ -723,6 +724,7 @@ func (h *APIHandler) runChannelsDetailed(ctx context.Context, types []slurp.Chan
 		case err := <-errorChan:
 			if err != nil {
 				h.sendWebSocketMessage(WSMessage{
+					ID:   "channel",
 					Type: "error",
 					Data: map[string]string{"message": err.Error()},
 				})
@@ -731,6 +733,7 @@ func (h *APIHandler) runChannelsDetailed(ctx context.Context, types []slurp.Chan
 
 		case <-ctx.Done():
 			h.sendWebSocketMessage(WSMessage{
+				ID:   "channel",
 				Type: "error",
 				Data: map[string]string{"message": "Channel loading cancelled"},
 			})
@@ -756,8 +759,8 @@ Loop:
 			}
 
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "message_result",
-				SearchID: searchID,
+				Type: "message_result",
+				ID:   searchID,
 				Data: MessageResult{
 					User:    message.User,
 					Date:    message.Date,
@@ -796,8 +799,8 @@ Loop:
 			}
 
 			h.sendWebSocketMessage(WSMessage{
-				Type:     "file_result",
-				SearchID: searchID,
+				Type: "file_result",
+				ID:   searchID,
 				Data: FileResult{
 					ID:       file.Raw.ID,
 					Name:     file.Name,

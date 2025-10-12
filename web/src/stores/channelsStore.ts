@@ -47,13 +47,21 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
       }
       
       // Set up WebSocket listeners
-      const handleChannelResult = (data: Channel) => {
+      const handleChannelResult = (id: string, data: Channel) => {
+        if (id != "channel") {
+          return
+        }
+
         set(state => ({
           channels: [...state.channels, data]
         }))
       }
       
-      const handleComplete = () => {
+      const handleComplete = (id: string) => {
+        if (id != "channel") {
+          return
+        }
+
         set({
           isLoading: false,
           isAsyncLoading: false,
@@ -65,7 +73,11 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
         wsManager.off('error', handleError)
       }
       
-      const handleError = (data: any) => {
+      const handleError = (id: string, data: any) => {
+        if (id != "channel") {
+          return
+        }
+
         set({
           error: data.message || 'Channel loading failed',
           isLoading: false,

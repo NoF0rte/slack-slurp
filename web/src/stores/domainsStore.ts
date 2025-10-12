@@ -11,11 +11,24 @@ interface DomainsState {
   error: string | null
   currentSearch: DomainSearchResponse | null
   
+  // Form state
+  domainsInput: string
+  selectedChannels: string[]
+  selectedUsers: string[]
+  beforeDate: string
+  afterDate: string
+  
   // Actions
   searchDomains: (request: DomainSearchRequest) => Promise<void>
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
+  setDomainsInput: (input: string) => void
+  setSelectedChannels: (channels: string[]) => void
+  setSelectedUsers: (users: string[]) => void
+  setBeforeDate: (date: string) => void
+  setAfterDate: (date: string) => void
+  clearForm: () => void
 }
 
 export const useDomainsStore = create<DomainsState>((set, get) => ({
@@ -25,11 +38,13 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
   error: null,
   currentSearch: null,
   dismissComplete: false,
-  progress: {
-    domainsProcessed: 0,
-    totalDomains: 0,
-    messagesScanned: 0
-  },
+  
+  // Form state
+  domainsInput: '',
+  selectedChannels: [],
+  selectedUsers: [],
+  beforeDate: '',
+  afterDate: '',
 
   searchDomains: async (request: DomainSearchRequest) => {
     set({ isLoading: true, error: null, isSearching: true })
@@ -44,21 +59,32 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       }
       
       // Set up WebSocket listeners
-      const handleDomainResult = (data: DomainResult) => {
+      const handleDomainResult = (id: string, data: DomainResult) => {
+        const state = get()
+        const currentSearch = state.currentSearch
+        if (!currentSearch || currentSearch.search_id != id) {
+          return
+        }
+
         set(state => ({
           results: [...state.results, data]
         }))
       }
       
-      const handleComplete = () => {
-        const currentSearch = get().currentSearch
+      const handleComplete = (id: string) => {
+        const state = get()
+        const currentSearch = state.currentSearch
+        if (!currentSearch || currentSearch.search_id != id) {
+          return
+        }
+        
         set({
           isSearching: false,
           isLoading: false,
           currentSearch: currentSearch ? {
             search_id: currentSearch.search_id,
             status: 'completed' as const,
-            total_found: get().results.length,
+            total_found: state.results.length,
             domains_searched: currentSearch.domains_searched
           } : null
         })
@@ -69,7 +95,13 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
         wsManager.off('error', handleError)
       }
       
-      const handleError = (data: any) => {
+      const handleError = (id: string, data: any) => {
+        const state = get()
+        const currentSearch = state.currentSearch
+        if (!currentSearch || currentSearch.search_id != id) {
+          return
+        }
+
         set({
           error: data.message || 'Search failed',
           isLoading: false,
@@ -121,8 +153,37 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
     
     set({
       isSearching: false,
-      isLoading: false,
-      currentSearch: null
+      isLoading: false
+    })
+  },
+
+  setDomainsInput: (input: string) => {
+    set({ domainsInput: input })
+  },
+
+  setSelectedChannels: (channels: string[]) => {
+    set({ selectedChannels: channels })
+  },
+
+  setSelectedUsers: (users: string[]) => {
+    set({ selectedUsers: users })
+  },
+
+  setBeforeDate: (date: string) => {
+    set({ beforeDate: date })
+  },
+
+  setAfterDate: (date: string) => {
+    set({ afterDate: date })
+  },
+
+  clearForm: () => {
+    set({
+      domainsInput: '',
+      selectedChannels: [],
+      selectedUsers: [],
+      beforeDate: '',
+      afterDate: ''
     })
   },
 }))

@@ -28,15 +28,22 @@ export function SearchPage() {
     clearResults, 
     clearError, 
     stopSearch,
-    setSearchType
+    setSearchType,
+    searchQuery,
+    selectedChannels,
+    selectedUsers,
+    beforeDate,
+    afterDate,
+    fileTypes,
+    setSearchQuery,
+    setSelectedChannels,
+    setSelectedUsers,
+    setBeforeDate,
+    setAfterDate,
+    setFileTypes,
+    clearForm
   } = useSearchStore()
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
-  const [beforeDate, setBeforeDate] = useState('')
-  const [afterDate, setAfterDate] = useState('')
-  const [fileTypes, setFileTypes] = useState('')
   const [showMessages, setShowMessages] = useState(true)
   const [showFiles, setShowFiles] = useState(true)
   const [filterQuery, setFilterQuery] = useState('')
@@ -258,7 +265,7 @@ export function SearchPage() {
                 <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                Use Slack's search syntax. Examples: "from:@username", "in:#channel", "has:link", "before:2024-01-01"
+                Enter Slack search query
               </p>
             </div>
             
@@ -375,7 +382,15 @@ export function SearchPage() {
           )}
           <span>{isSearching ? 'Searching...' : 'Search'}</span>
         </button>
-
+        
+        <button
+          onClick={clearForm}
+          disabled={isSearching}
+          className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <ArrowPathIcon className="w-4 h-4" />
+          <span>Clear Form</span>
+        </button>
       </div>
 
       {/* Error Display */}

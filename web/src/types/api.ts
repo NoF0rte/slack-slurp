@@ -155,8 +155,7 @@ export interface FileResult {
 }
 
 export interface WSMessage {
+  id: string
   type: 'error' | 'complete' | 'connected' | 'domain_result' | 'url_result' | 'message_result' | 'file_result'
   data: any
-  scan_id?: string
-  search_id?: string
 }

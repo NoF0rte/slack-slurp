@@ -22,15 +22,21 @@ export function DomainsPage() {
     searchDomains, 
     clearResults, 
     clearError, 
-    stopSearch
+    stopSearch,
+    domainsInput,
+    selectedChannels,
+    selectedUsers,
+    beforeDate,
+    afterDate,
+    setDomainsInput,
+    setSelectedChannels,
+    setSelectedUsers,
+    setBeforeDate,
+    setAfterDate,
+    clearForm
   } = useDomainsStore()
   
-  const [domainsInput, setDomainsInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
-  const [beforeDate, setBeforeDate] = useState('')
-  const [afterDate, setAfterDate] = useState('')
 
   const handleSearch = async () => {
     const domains = domainsInput
@@ -192,6 +198,15 @@ export function DomainsPage() {
         >
           <PlayIcon className="w-4 h-4" />
           <span>Start Search</span>
+        </button>
+        
+        <button
+          onClick={clearForm}
+          disabled={isLoading || isSearching}
+          className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <ArrowPathIcon className="w-4 h-4" />
+          <span>Clear Form</span>
         </button>
       </div>
 

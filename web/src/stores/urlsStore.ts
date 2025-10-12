@@ -11,11 +11,22 @@ interface URLsState {
   error: string | null
   currentSearch: URLSearchResponse | null
   
+  // Form state
+  selectedChannels: string[]
+  selectedUsers: string[]
+  beforeDate: string
+  afterDate: string
+  
   // Actions
   searchURLs: (request: URLSearchRequest) => Promise<void>
   clearResults: () => void
   clearError: () => void
   stopSearch: () => void
+  setSelectedChannels: (channels: string[]) => void
+  setSelectedUsers: (users: string[]) => void
+  setBeforeDate: (date: string) => void
+  setAfterDate: (date: string) => void
+  clearForm: () => void
 }
 
 export const useURLsStore = create<URLsState>((set, get) => ({
@@ -25,6 +36,12 @@ export const useURLsStore = create<URLsState>((set, get) => ({
   error: null,
   currentSearch: null,
   dismissComplete: false,
+  
+  // Form state
+  selectedChannels: [],
+  selectedUsers: [],
+  beforeDate: '',
+  afterDate: '',
 
   searchURLs: async (request: URLSearchRequest) => {
     set({ isLoading: true, error: null, isSearching: true })
@@ -39,21 +56,31 @@ export const useURLsStore = create<URLsState>((set, get) => ({
       }
       
       // Set up WebSocket listeners
-      const handleURLResult = (data: string) => {
+      const handleURLResult = (id: string, data: string) => {
+        const currentSearch = get().currentSearch
+        if (!currentSearch || currentSearch.search_id != id) {
+          return
+        }
+
         set(state => ({
           results: [...state.results, data]
         }))
       }
       
-      const handleComplete = () => {
-        const currentSearch = get().currentSearch
+      const handleComplete = (id: string) => {
+        const state = get()
+        const currentSearch = state.currentSearch
+        if (!currentSearch || currentSearch.search_id != id) {
+          return
+        }
+
         set({
           isSearching: false,
           isLoading: false,
           currentSearch: currentSearch ? {
             search_id: currentSearch.search_id,
             status: 'completed' as const,
-            total_found: get().results.length
+            total_found: state.results.length
           } : null
         })
         
@@ -63,7 +90,12 @@ export const useURLsStore = create<URLsState>((set, get) => ({
         wsManager.off('error', handleError)
       }
       
-      const handleError = (data: any) => {
+      const handleError = (id: string, data: any) => {
+        const currentSearch = get().currentSearch
+        if (!currentSearch || currentSearch.search_id != id) {
+          return
+        }
+
         set({
           error: data.message || 'Search failed',
           isLoading: false,
@@ -115,8 +147,32 @@ export const useURLsStore = create<URLsState>((set, get) => ({
     
     set({
       isSearching: false,
-      isLoading: false,
-      currentSearch: null
+      isLoading: false
+    })
+  },
+
+  setSelectedChannels: (channels: string[]) => {
+    set({ selectedChannels: channels })
+  },
+
+  setSelectedUsers: (users: string[]) => {
+    set({ selectedUsers: users })
+  },
+
+  setBeforeDate: (date: string) => {
+    set({ beforeDate: date })
+  },
+
+  setAfterDate: (date: string) => {
+    set({ afterDate: date })
+  },
+
+  clearForm: () => {
+    set({
+      selectedChannels: [],
+      selectedUsers: [],
+      beforeDate: '',
+      afterDate: ''
     })
   },
 }))

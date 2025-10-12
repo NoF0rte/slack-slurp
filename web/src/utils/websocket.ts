@@ -5,7 +5,7 @@ export class WebSocketManager {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
-  private listeners: Map<string, ((data: any) => void)[]> = new Map()
+  private listeners: Map<string, ((id: string, data: any) => void)[]> = new Map()
 
   constructor(private url: string) {}
 
@@ -17,14 +17,14 @@ export class WebSocketManager {
         this.ws.onopen = () => {
           console.log('WebSocket connected')
           this.reconnectAttempts = 0
-          this.emit('connected', {})
+          this.emit('connected', "", {})
           resolve()
         }
 
         this.ws.onmessage = (event) => {
           try {
             const message: WSMessage = JSON.parse(event.data)
-            this.emit(message.type, message.data)
+            this.emit(message.type, message.id, message.data)
           } catch (error) {
             console.error('Failed to parse WebSocket message:', error)
           }
@@ -51,14 +51,14 @@ export class WebSocketManager {
     })
   }
 
-  on(event: string, callback: (data: any) => void) {
+  on(event: string, callback: (id: string, data: any) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, [])
     }
     this.listeners.get(event)!.push(callback)
   }
 
-  off(event: string, callback: (data: any) => void) {
+  off(event: string, callback: (id: string, data: any) => void) {
     const callbacks = this.listeners.get(event)
     if (callbacks) {
       const index = callbacks.indexOf(callback)
@@ -68,10 +68,10 @@ export class WebSocketManager {
     }
   }
 
-  private emit(event: string, data: any) {
+  private emit(event: string, id: string, data: any) {
     const callbacks = this.listeners.get(event)
     if (callbacks) {
-      callbacks.forEach(callback => callback(data))
+      callbacks.forEach(callback => callback(id, data))
     }
   }
 
