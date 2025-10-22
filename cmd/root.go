@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"sort"
 
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/spf13/cobra"
@@ -52,54 +53,14 @@ func init() {
 }
 
 func initConfig() {
-	setConfigDefault("detectors", []string{
-		"anthropic",
-		"atlassianv1",
-		"atlassianv2",
-		"bitbucketapppassword",
-		"box",
-		"boxoauth",
-		"digitaloceanv2",
-		"docker",
-		"mongodb",
-		"ldap",
-		"gcpapplicationdefaultcredentials",
-		"ftp",
-		"auth0oauth",
-		"artifactory",
-		"auth0managementapitoken",
-		"awssessionkeys",
-		"awsaccesskeys",
-		"azuredirectmanagementkey",
-		"censys",
-		"cloudflareapitoken",
-		"cloudflarecakey",
-		"digitaloceantoken",
-		"discordbottoken",
-		"discordwebhook",
-		"dropbox",
-		"gcp",
-		"generic",
-		"githubv1",
-		"githubv2",
-		"github_oauth2",
-		"githubapp",
-		"gitlabv1",
-		"gitlabv2",
-		"herokuv1",
-		"herokuv2",
-		"jiratokenv1",
-		"jiratokenv2",
-		"microsoftteamswebhook",
-		"okta",
-		"pastebin",
-		"privatekey",
-		"shodankey",
-		"slack",
-		"slackwebhook",
-		"terraformcloudpersonaltoken",
-		"uri",
-	})
+	var detectors []string
+	for d := range slurp.BuiltInDetectors {
+		detectors = append(detectors, d)
+	}
+
+	sort.Strings(detectors)
+
+	setConfigDefault("detectors", detectors)
 	setConfigDefault("custom-detectors", []string{})
 
 	setConfigDefault("domains", []string{})

@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +32,10 @@ type APIHandler struct {
 
 	mu        sync.RWMutex
 	searchMap map[string]context.CancelFunc
+
+	// Custom detector storage
+	customDetectorsPath string
+	customDetectorsMu   sync.RWMutex
 }
 
 type SearchFiltersRequest struct {
@@ -72,10 +79,39 @@ func (o *SearchFiltersRequest) toSearchOptions() ([]slurp.SearchOption, error) {
 
 // Request/Response types
 type SecretScanRequest struct {
-	Channels     []string `json:"channels"`
+	SearchFiltersRequest
 	Detectors    []string `json:"detectors"`
 	Verify       bool     `json:"verify"`
 	VerifiedOnly bool     `json:"verified_only"`
+}
+
+type DetectorInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	IsCustom    bool   `json:"is_custom"`
+}
+
+type CustomDetector struct {
+	Name        string   `json:"name"`
+	Keywords    []string `json:"keywords"`
+	Patterns    []string `json:"patterns"`
+	Description string   `json:"description"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
+}
+
+type CreateCustomDetectorRequest struct {
+	Name        string   `json:"name"`
+	Keywords    []string `json:"keywords"`
+	Patterns    []string `json:"patterns"`
+	Description string   `json:"description"`
+}
+
+type UpdateCustomDetectorRequest struct {
+	Name        *string  `json:"name,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
+	Patterns    []string `json:"patterns,omitempty"`
+	Description *string  `json:"description,omitempty"`
 }
 
 type SearchRequest struct {
@@ -435,10 +471,57 @@ func (h *APIHandler) StartSecretScan(c *gin.Context) {
 		return
 	}
 
+	if len(req.Detectors) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "detectors must be selected"})
+		return
+	}
+
 	scanID := generateScanID()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	h.mu.Lock()
+	h.searchMap[scanID] = cancel
+	h.mu.Unlock()
+
+	selectedDetectors := h.config.GetDetectors(req.Detectors...)
+
+	// Create secret options
+	secretOptions := []slurp.SecretOption{
+		slurp.SecretsDetectors(selectedDetectors...),
+		slurp.SecretsVerify(req.Verify),
+	}
+
+	if len(req.Channels) != 0 {
+		secretOptions = append(secretOptions, slurp.SecretsInChannel(req.Channels...))
+	}
+
+	if len(req.Users) != 0 {
+		secretOptions = append(secretOptions, slurp.SecretsFromUsers(req.Users...))
+	}
+
+	if req.Before != "" {
+		beforeTime, err := time.Parse("2006-01-02", req.Before)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("error parsing 'before' date")})
+			return
+		}
+
+		secretOptions = append(secretOptions, slurp.SecretsBefore(beforeTime))
+	}
+
+	if req.After != "" {
+		afterTime, err := time.Parse("2006-01-02", req.After)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("error parsing 'after' date")})
+			return
+		}
+
+		secretOptions = append(secretOptions, slurp.SecretsAfter(afterTime))
+	}
+
 	// Start async scan
-	go h.runSecretScan(scanID, req)
+	go h.runSecretScan(ctx, scanID, secretOptions)
 
 	c.JSON(http.StatusOK, gin.H{
 		"scan_id": scanID,
@@ -449,31 +532,36 @@ func (h *APIHandler) StartSecretScan(c *gin.Context) {
 func (h *APIHandler) GetScanStatus(c *gin.Context) {
 	scanID := c.Param("id")
 
-	// TODO: Implement scan status tracking
+	// Check if scan is still running
+	h.mu.RLock()
+	_, isRunning := h.searchMap[scanID]
+	h.mu.RUnlock()
+
+	status := "completed"
+	if isRunning {
+		status = "running"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"scan_id": scanID,
-		"status":  "running",
-	})
-}
-
-func (h *APIHandler) GetScanResults(c *gin.Context) {
-	scanID := c.Param("id")
-
-	// TODO: Implement scan results storage and retrieval
-	c.JSON(http.StatusOK, gin.H{
-		"scan_id": scanID,
-		"results": []interface{}{},
+		"status":  status,
 	})
 }
 
 func (h *APIHandler) CancelScan(c *gin.Context) {
 	scanID := c.Param("id")
 
-	// TODO: Implement scan cancellation
-	c.JSON(http.StatusOK, gin.H{
-		"scan_id": scanID,
-		"status":  "cancelled",
-	})
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	cancel, ok := h.searchMap[scanID]
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "search not found"})
+	}
+
+	cancel()
+
+	c.JSON(http.StatusOK, gin.H{"status": "stopped"})
 }
 
 func (h *APIHandler) DownloadFile(c *gin.Context) {
@@ -491,6 +579,266 @@ func (h *APIHandler) DownloadFile(c *gin.Context) {
 	io.Copy(c.Writer, buffer)
 }
 
+// Detector management functions
+
+// GetBuiltInDetectors returns available built-in detectors
+func (h *APIHandler) GetBuiltInDetectors(c *gin.Context) {
+	var detectorInfos []DetectorInfo
+	for name, detector := range slurp.BuiltInDetectors {
+		detectorInfos = append(detectorInfos, DetectorInfo{
+			Name:        name,
+			Description: detector.Description(),
+			IsCustom:    false,
+		})
+	}
+
+	slices.SortFunc(detectorInfos, func(a DetectorInfo, b DetectorInfo) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	c.JSON(http.StatusOK, detectorInfos)
+}
+
+// GetCustomDetectors returns all custom detectors
+// func (h *APIHandler) GetCustomDetectors(c *gin.Context) {
+// 	detectors, err := h.loadCustomDetectors()
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, detectors)
+// }
+
+// CreateCustomDetector creates a new custom detector
+// func (h *APIHandler) CreateCustomDetector(c *gin.Context) {
+// 	var req CreateCustomDetectorRequest
+// 	if err := c.ShouldBindJSON(&req); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
+
+// 	// Validate request
+// 	if req.Name == "" {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+// 		return
+// 	}
+// 	if req.Description == "" {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Description is required"})
+// 		return
+// 	}
+// 	if len(req.Keywords) == 0 {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one keyword is required"})
+// 		return
+// 	}
+// 	if len(req.Patterns) == 0 {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one regex pattern is required"})
+// 		return
+// 	}
+
+// 	// Validate regex patterns
+// 	for i, pattern := range req.Patterns {
+// 		if _, err := regexp.Compile(pattern); err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid regex pattern at index %d: %s", i, err.Error())})
+// 			return
+// 		}
+// 	}
+
+// 	// Load existing detectors
+// 	detectors, err := h.loadCustomDetectors()
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
+// 		return
+// 	}
+
+// 	// Check for duplicate name
+// 	for _, detector := range detectors {
+// 		if detector.Name == req.Name {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": "A detector with this name already exists"})
+// 			return
+// 		}
+// 	}
+
+// 	// Create new detector
+// 	now := time.Now().Format(time.RFC3339)
+// 	detector := CustomDetector{
+// 		Name:        req.Name,
+// 		Keywords:    req.Keywords,
+// 		Patterns:    req.Patterns,
+// 		Description: req.Description,
+// 		CreatedAt:   now,
+// 		UpdatedAt:   now,
+// 	}
+
+// 	// Add to list and save
+// 	detectors = append(detectors, detector)
+// 	if err := h.saveCustomDetectors(detectors); err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save custom detector: " + err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusCreated, detector)
+// }
+
+// UpdateCustomDetector updates an existing custom detector
+// func (h *APIHandler) UpdateCustomDetector(c *gin.Context) {
+// 	oldDetectorName := c.Param("name")
+
+// 	var req UpdateCustomDetectorRequest
+// 	if err := c.ShouldBindJSON(&req); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
+
+// 	// Load existing detectors
+// 	detectors, err := h.loadCustomDetectors()
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
+// 		return
+// 	}
+
+// 	// Find detector
+// 	var detector *CustomDetector
+// 	for _, d := range detectors {
+// 		if d.Name == oldDetectorName {
+// 			detector = &d
+// 			break
+// 		}
+// 	}
+
+// 	if detector == nil {
+// 		c.JSON(http.StatusNotFound, gin.H{"error": "Custom detector not found"})
+// 		return
+// 	}
+
+// 	// Update fields
+// 	if req.Name != nil {
+// 		// Check for duplicate name
+// 		for _, d := range detectors {
+// 			if d.Name != oldDetectorName && d.Name == *req.Name {
+// 				c.JSON(http.StatusBadRequest, gin.H{"error": "A detector with this name already exists"})
+// 				return
+// 			}
+// 		}
+// 		detector.Name = *req.Name
+// 	}
+// 	if req.Description != nil {
+// 		detector.Description = *req.Description
+// 	}
+// 	if req.Keywords != nil {
+// 		detector.Keywords = req.Keywords
+// 	}
+// 	if req.Patterns != nil {
+// 		// Validate regex patterns
+// 		for i, pattern := range req.Patterns {
+// 			if _, err := regexp.Compile(pattern); err != nil {
+// 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid regex pattern at index %d: %s", i, err.Error())})
+// 				return
+// 			}
+// 		}
+// 		detector.Patterns = req.Patterns
+// 	}
+
+// 	detector.UpdatedAt = time.Now().Format(time.RFC3339)
+
+// 	// Save updated detectors
+// 	if err := h.saveCustomDetectors(detectors); err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save custom detector: " + err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, detector)
+// }
+
+// DeleteCustomDetector deletes a custom detector
+// func (h *APIHandler) DeleteCustomDetector(c *gin.Context) {
+// 	detectorID := c.Param("id")
+
+// 	// Load existing detectors
+// 	detectors, err := h.loadCustomDetectors()
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
+// 		return
+// 	}
+
+// 	// Find and remove detector
+// 	var found bool
+// 	for i, detector := range detectors {
+// 		if detector.ID == detectorID {
+// 			detectors = append(detectors[:i], detectors[i+1:]...)
+// 			found = true
+// 			break
+// 		}
+// 	}
+
+// 	if !found {
+// 		c.JSON(http.StatusNotFound, gin.H{"error": "Custom detector not found"})
+// 		return
+// 	}
+
+// 	// Save updated detectors
+// 	if err := h.saveCustomDetectors(detectors); err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save custom detector: " + err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, gin.H{"message": "Custom detector deleted successfully"})
+// }
+
+// Helper functions for custom detector storage
+
+func (h *APIHandler) getCustomDetectorsPath() string {
+	if h.customDetectorsPath == "" {
+		// Use current directory for now, in production this should be configurable
+		h.customDetectorsPath = filepath.Join(".", "custom_detectors.json")
+	}
+	return h.customDetectorsPath
+}
+
+func (h *APIHandler) loadCustomDetectors() ([]CustomDetector, error) {
+	h.customDetectorsMu.RLock()
+	defer h.customDetectorsMu.RUnlock()
+
+	path := h.getCustomDetectorsPath()
+
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return []CustomDetector{}, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var detectors []CustomDetector
+	if err := json.Unmarshal(data, &detectors); err != nil {
+		return nil, err
+	}
+
+	return detectors, nil
+}
+
+func (h *APIHandler) saveCustomDetectors(detectors []CustomDetector) error {
+	h.customDetectorsMu.Lock()
+	defer h.customDetectorsMu.Unlock()
+
+	path := h.getCustomDetectorsPath()
+
+	// Ensure directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(detectors, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0644)
+}
+
 func (h *APIHandler) HandleWebSocket(c *gin.Context) {
 	websocket.ServeWS(h.hub, c.Writer, c.Request, "dashboard", "dashboard")
 }
@@ -504,9 +852,65 @@ func generateSearchID() string {
 	return fmt.Sprintf("search_%d", time.Now().Unix())
 }
 
-func (h *APIHandler) runSecretScan(scanID string, req SecretScanRequest) {
-	// TODO: Implement actual secret scanning with WebSocket updates
-	// This is a placeholder for the async secret scanning logic
+func (h *APIHandler) runSecretScan(ctx context.Context, scanID string, secretOptions []slurp.SecretOption) {
+	defer func() {
+		h.mu.Lock()
+		delete(h.searchMap, scanID)
+		h.mu.Unlock()
+	}()
+
+	var err error
+
+	// Start secret scanning
+	secretChan, errorChan := h.slurper.GetSecretsAsyncWithContext(ctx, secretOptions...)
+
+Loop:
+	for {
+		select {
+		case <-ctx.Done():
+			err = <-errorChan // The ctx.Err will be coming from the errorChan
+			break Loop
+		case result, ok := <-secretChan:
+			if !ok {
+				break Loop
+			}
+
+			for _, secret := range result.Secrets {
+				h.sendWebSocketMessage(WSMessage{
+					Type: "secret_result",
+					ID:   scanID,
+					Data: map[string]interface{}{
+						"detector":  result.Type,
+						"secret":    secret.Raw,
+						"context":   result.Message.Text,
+						"channel":   result.Message.Channel,
+						"user":      result.Message.User,
+						"timestamp": result.Message.Date.Format(time.RFC3339),
+						"verified":  secret.Verified,
+					},
+				})
+			}
+		case err = <-errorChan:
+			break Loop
+		}
+	}
+	close(errorChan)
+
+	if err != nil && err != context.Canceled {
+		h.sendWebSocketMessage(WSMessage{
+			Type: "error",
+			ID:   scanID,
+			Data: map[string]string{"message": "Search error: " + err.Error()},
+		})
+
+		return
+	}
+
+	// Send completion message
+	h.sendWebSocketMessage(WSMessage{
+		Type: "complete",
+		ID:   scanID,
+	})
 }
 
 func (h *APIHandler) runDomainSearch(ctx context.Context, searchID string, domains []string, options []slurp.SearchOption) {

@@ -74,7 +74,10 @@ export interface SearchRequest {
 }
 
 export interface SecretScanRequest {
-  channels: string[]
+  channels?: string[]
+  users?: string[]
+  before?: string
+  after?: string
   detectors: string[]
   verify: boolean
   verified_only: boolean
@@ -83,11 +86,9 @@ export interface SecretScanRequest {
 export interface SecretScanResult {
   scan_id: string
   status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
-  results?: SecretResult[]
 }
 
 export interface SecretResult {
-  id: string
   detector: string
   secret: string
   context: string
@@ -95,7 +96,23 @@ export interface SecretResult {
   user: string
   timestamp: string
   verified: boolean
-  risk_level: 'low' | 'medium' | 'high' | 'critical'
+}
+
+export interface CustomDetector {
+  id: string
+  name: string
+  keywords: string[]
+  patterns: string[]
+  description: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DetectorInfo {
+  id: string
+  name: string
+  description: string
+  is_custom: boolean
 }
 
 export interface DomainSearchRequest {

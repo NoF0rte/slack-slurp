@@ -4,6 +4,7 @@ import { UsersPage } from './users/UsersPage'
 import { DomainsPage } from './domains/DomainsPage'
 import { URLsPage } from './urls/URLsPage'
 import { SearchPage } from './search/SearchPage'
+import { SecretsPage } from './secrets/SecretsPage'
 
 type Route = 'dashboard' | 'channels' | 'users' | 'domains' | 'urls' | 'search' | 'secrets' | 'settings'
 
@@ -39,7 +40,7 @@ export function Router() {
       case 'search':
         return <SearchPage />
       case 'secrets':
-        return <div className="p-6"><h1 className="text-2xl font-bold text-white">Secret Scanner</h1><p className="text-gray-400">Secret scanner page coming soon...</p></div>
+        return <SecretsPage />
       case 'settings':
         return <div className="p-6"><h1 className="text-2xl font-bold text-white">Settings</h1><p className="text-gray-400">Settings page coming soon...</p></div>
       case 'dashboard':

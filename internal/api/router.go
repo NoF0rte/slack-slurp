@@ -43,8 +43,14 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		// Secret Detection
 		api.POST("/secrets/scan", handler.StartSecretScan)
 		api.GET("/secrets/status/:id", handler.GetScanStatus)
-		api.GET("/secrets/results/:id", handler.GetScanResults)
-		api.DELETE("/secrets/:id", handler.CancelScan)
+		api.POST("/secrets/scan/stop/:id", handler.CancelScan)
+
+		// Detector Management
+		api.GET("/secrets/detectors", handler.GetBuiltInDetectors)
+		// api.GET("/secrets/custom-detectors", handler.GetCustomDetectors)
+		// api.POST("/secrets/custom-detectors", handler.CreateCustomDetector)
+		// api.PUT("/secrets/custom-detectors/:name", handler.UpdateCustomDetector)
+		// api.DELETE("/secrets/custom-detectors/:name", handler.DeleteCustomDetector)
 
 		api.GET("/download/:id", handler.DownloadFile)
 	}

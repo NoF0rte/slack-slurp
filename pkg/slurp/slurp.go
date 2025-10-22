@@ -191,6 +191,24 @@ func SecretsInChannel(channels ...string) SecretOption {
 	}
 }
 
+func SecretsBefore(date time.Time) SecretOption {
+	return func(opts *SecretOptions) {
+		opts.searchOptions = append(opts.searchOptions, SearchBefore(date))
+	}
+}
+
+func SecretsAfter(date time.Time) SecretOption {
+	return func(opts *SecretOptions) {
+		opts.searchOptions = append(opts.searchOptions, SearchAfter(date))
+	}
+}
+
+func SecretsFromUsers(users ...string) SecretOption {
+	return func(opts *SecretOptions) {
+		opts.searchOptions = append(opts.searchOptions, SearchFromUsers(users...))
+	}
+}
+
 func SecretsDetectors(detectrs ...detectors.Detector) SecretOption {
 	return func(opts *SecretOptions) {
 		opts.detectors = detectrs
@@ -868,6 +886,11 @@ func (s Slurper) GetSecretsAsyncWithContext(ctx context.Context, opts ...SecretO
 	}()
 
 	return secretChan, errorChan
+}
+
+// GetAvailableDetectors returns all available built-in detectors
+func (s Slurper) GetAvailableDetectors() []detectors.Detector {
+	return s.detectors
 }
 
 // GetDomains searches Slack for domains and subdomains. Will return only once all domains have been retrieved.
