@@ -1,4 +1,3 @@
-import React from 'react'
 import { FileResult } from '../../types/api'
 import { 
   UserIcon, 
@@ -15,10 +14,10 @@ import {
   TableCellsIcon,
   DocumentIcon
 } from '@heroicons/react/24/outline'
+import Highlighter from 'react-highlight-words'
 
 interface FileCardProps {
   file: FileResult
-  highlightText?: (text: string, searchTerm?: string) => React.ReactNode
   searchTerm?: string
 }
 
@@ -134,7 +133,7 @@ const getFileTypeInfo = (filetype: string) => {
     }
   }
 
-export function FileCard({ file, highlightText, searchTerm }: FileCardProps) {
+export function FileCard({ file, searchTerm }: FileCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString()
@@ -165,7 +164,16 @@ export function FileCard({ file, highlightText, searchTerm }: FileCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-white truncate">
-              {highlightText ? highlightText(file.name, searchTerm) : file.name}
+              {searchTerm ? (
+                <Highlighter
+                  searchWords={[searchTerm]}
+                  textToHighlight={file.name}
+                  highlightClassName="bg-yellow-200 text-yellow-900 px-1 rounded\"
+                  autoEscape={true}
+                />
+              ) : (
+                file.name
+              )}
             </h3>
              {file.id && (
               <a

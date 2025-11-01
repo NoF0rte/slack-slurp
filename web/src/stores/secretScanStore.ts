@@ -19,6 +19,9 @@ interface SecretScanState {
   verify: boolean
   verifiedOnly: boolean
   
+  // False positive management
+  hideFalsePositives: boolean
+  
   // Detector management
   builtinDetectors: DetectorInfo[]
   customDetectors: CustomDetector[]
@@ -37,6 +40,10 @@ interface SecretScanState {
   setVerify: (verify: boolean) => void
   setVerifiedOnly: (verifiedOnly: boolean) => void
   clearForm: () => void
+  
+  // False positive actions
+  toggleFalsePositive: (resultId: string) => void
+  setHideFalsePositives: (hide: boolean) => void
   
   // Detector management actions
   loadDetectors: () => Promise<void>
@@ -60,6 +67,9 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
   selectedDetectors: [],
   verify: true,
   verifiedOnly: false,
+  
+  // False positive management
+  hideFalsePositives: true,
   
   // Detector management
   builtinDetectors: [],
@@ -86,8 +96,14 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
           return
         }
 
+        // Generate a unique ID for the result if it doesn't have one
+        const resultWithId = {
+          ...data,
+          id: data.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }
+
         set(state => ({
-          results: [...state.results, data]
+          results: [...state.results, resultWithId]
         }))
       }
       
@@ -213,6 +229,21 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
       verify: true,
       verifiedOnly: false
     })
+  },
+
+  // False positive actions
+  toggleFalsePositive: (resultId: string) => {
+    set(state => ({
+      results: state.results.map(result => 
+        result.id === resultId 
+          ? { ...result, false_positive: !result.false_positive }
+          : result
+      )
+    }))
+  },
+
+  setHideFalsePositives: (hide: boolean) => {
+    set({ hideFalsePositives: hide })
   },
 
   loadDetectors: async () => {

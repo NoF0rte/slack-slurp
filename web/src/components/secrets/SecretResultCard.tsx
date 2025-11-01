@@ -2,17 +2,83 @@ import { SecretResult } from '../../types/api'
 import { 
   UserIcon,
   CalendarIcon,
-  ChatBubbleLeftIcon
+  ChatBubbleLeftIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  XMarkIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline'
+import { useState } from 'react'
+import Highlighter from 'react-highlight-words'
 
 interface SecretResultCardProps {
   result: SecretResult
+  onToggleFalsePositive: () => void
 }
 
-export function SecretResultCard({ result }: SecretResultCardProps) {
+export function SecretResultCard({ result, onToggleFalsePositive }: SecretResultCardProps) {
+  const [isContextExpanded, setIsContextExpanded] = useState(true)
+  
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString()
+  }
+
+  // Extract secrets for highlighting
+  const secretsToHighlight = result.secrets.map(s => s.raw).filter(secret => secret && secret.trim() !== '')
+  
+
+  // Function to parse and render message with proper code blocks
+  const renderMessage = (text: string) => {
+    // Split by triple backticks for code blocks
+    const parts = text.split(/```([^`]*)```/g)
+    
+    return parts.map((part, index) => {
+      // Odd indices are code blocks
+      if (index % 2 === 1) {
+        return (
+          <pre key={index} className="bg-gray-900 text-gray-300 p-3 rounded-md overflow-x-auto my-2">
+            <code>
+              <Highlighter
+                searchWords={secretsToHighlight}
+                textToHighlight={part}
+                highlightClassName="bg-yellow-200 text-yellow-900 px-1 rounded"
+                autoEscape={true}
+              />
+            </code>
+          </pre>
+        )
+      }
+      
+      // Even indices are regular text - split by single backticks for inline code
+      const inlineParts = part.split(/`([^`]*)`/g)
+      
+      return (
+        <span key={index}>
+          {inlineParts.map((inlinePart, inlineIndex) => {
+            // Odd indices are inline code
+            if (inlineIndex % 2 === 1) {
+              return (
+                <code key={inlineIndex} className="bg-gray-700 text-gray-300 px-1 rounded text-sm">
+                  {inlinePart}
+                </code>
+              )
+            }
+            
+            // Even indices are regular text - highlight secrets
+            return (
+              <Highlighter
+                key={inlineIndex}
+                searchWords={secretsToHighlight}
+                textToHighlight={inlinePart}
+                highlightClassName="bg-yellow-200 text-yellow-900 px-1 rounded"
+                autoEscape={true}
+              />
+            )
+          })}
+        </span>
+      )
+    })
   }
 
   return (
@@ -31,29 +97,72 @@ export function SecretResultCard({ result }: SecretResultCardProps) {
                   UNVERIFIED
                 </span>
               )}
+              {result.false_positive && (
+                <span className="text-xs px-2 py-1 rounded bg-red-900/20 text-red-400">
+                  FALSE POSITIVE
+                </span>
+              )}
             </div>
           </div>
         </div>
+        <button
+          onClick={() => onToggleFalsePositive()}
+          className={`flex items-center space-x-1 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            result.false_positive
+              ? 'bg-green-600 text-white hover:bg-green-700'
+              : 'bg-red-600 text-white hover:bg-red-700'
+          }`}
+          title={result.false_positive ? 'Mark as valid' : 'Mark as false positive'}
+        >
+          {result.false_positive ? (
+            <>
+              <CheckIcon className="w-3 h-3" />
+              <span>Valid</span>
+            </>
+          ) : (
+            <>
+              <XMarkIcon className="w-3 h-3" />
+              <span>False Positive</span>
+            </>
+          )}
+        </button>
       </div>
 
-      {/* Secret Value */}
+      {/* Secrets List */}
       <div className="mb-3">
-        <label className="block text-xs font-medium text-gray-400 mb-1">
-          Secret Value
+        <label className="block text-xs font-medium text-gray-400 mb-2">
+          Detected Secrets
         </label>
-        <div className="bg-gray-900 rounded-md p-2 font-mono text-sm text-gray-300 break-all">
-          {result.secret}
+        <div className="space-y-2">
+          {result.secrets.map((secret, index) => (
+            <div key={index} className="bg-gray-700 rounded-md p-3">
+              <div className="font-mono text-sm text-gray-300 break-all">
+                {secret.raw}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Context */}
+      {/* Context - Collapsible */}
       <div className="mb-3">
-        <label className="block text-xs font-medium text-gray-400 mb-1">
-          Context
-        </label>
-        <div className="bg-gray-900 rounded-md p-2 text-sm text-gray-300 whitespace-pre-wrap break-words">
-          {result.context}
-        </div>
+        <button
+          onClick={() => setIsContextExpanded(!isContextExpanded)}
+          className="flex items-center space-x-2 text-xs font-medium text-gray-400 hover:text-gray-300 transition-colors mb-2"
+        >
+          {isContextExpanded ? (
+            <ChevronDownIcon className="w-4 h-4" />
+          ) : (
+            <ChevronRightIcon className="w-4 h-4" />
+          )}
+          <span>Context</span>
+        </button>
+        
+        {isContextExpanded && (
+          <div className="bg-gray-900 rounded-md p-3 text-sm text-gray-300 whitespace-pre-wrap break-words">
+            {renderMessage(result.context)}
+          </div>
+        )}
       </div>
 
       {/* Metadata */}

@@ -875,21 +875,19 @@ Loop:
 				break Loop
 			}
 
-			for _, secret := range result.Secrets {
-				h.sendWebSocketMessage(WSMessage{
-					Type: "secret_result",
-					ID:   scanID,
-					Data: map[string]interface{}{
-						"detector":  result.Type,
-						"secret":    secret.Raw,
-						"context":   result.Message.Text,
-						"channel":   result.Message.Channel,
-						"user":      result.Message.User,
-						"timestamp": result.Message.Date.Format(time.RFC3339),
-						"verified":  secret.Verified,
-					},
-				})
-			}
+			h.sendWebSocketMessage(WSMessage{
+				Type: "secret_result",
+				ID:   scanID,
+				Data: map[string]interface{}{
+					"detector":  result.Type,
+					"secrets":   result.Secrets,
+					"context":   result.Message.Text,
+					"channel":   result.Message.Channel,
+					"user":      result.Message.User,
+					"timestamp": result.Message.Date.Format(time.RFC3339),
+				},
+			})
+
 		case err = <-errorChan:
 			break Loop
 		}

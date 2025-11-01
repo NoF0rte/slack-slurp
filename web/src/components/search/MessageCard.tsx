@@ -1,14 +1,13 @@
-import React from 'react'
 import { MessageResult } from '../../types/api'
 import { UserIcon, CalendarIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline'
+import Highlighter from 'react-highlight-words'
 
 interface MessageCardProps {
   message: MessageResult
-  highlightText?: (text: string, searchTerm?: string) => React.ReactNode
   searchTerm?: string
 }
 
-export function MessageCard({ message, highlightText, searchTerm }: MessageCardProps) {
+export function MessageCard({ message, searchTerm }: MessageCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString()
@@ -39,7 +38,16 @@ export function MessageCard({ message, highlightText, searchTerm }: MessageCardP
           </div>
           
           <div className="text-gray-300 whitespace-pre-wrap break-words overflow-wrap-anywhere hyphens-auto w-full">
-            {highlightText ? highlightText(message.text, searchTerm) : message.text}
+            {searchTerm ? (
+              <Highlighter
+                searchWords={[searchTerm]}
+                textToHighlight={message.text}
+                highlightClassName="bg-yellow-200 text-yellow-900 px-1 rounded\"
+                autoEscape={true}
+              />
+            ) : (
+              message.text
+            )}
           </div>
         </div>
       </div>

@@ -114,63 +114,7 @@ export function SearchPage() {
     )
   })
 
-  // Highlight search terms in text
-  const highlightText = (text: string, searchTerm?: string, isCodeBlock = false) => {
-    if (!searchTerm) return text
-    
-    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-    const parts = text.split(regex)
-    
-    return parts.map((part, index) => 
-      regex.test(part) ? (
-        <mark key={index} className={`px-1 rounded ${
-          isCodeBlock 
-            ? 'bg-yellow-300 text-yellow-900' // Brighter highlight for code blocks
-            : 'bg-yellow-200 text-yellow-900' // Standard highlight for regular text
-        }`}>
-          {part}
-        </mark>
-      ) : part
-    )
-  }
 
-  // Render Slack text with code blocks and inline code
-  const renderSlackText = (text: string, searchTerm?: string) => {
-    // Split by code blocks first
-    const codeBlockRegex = /```([\s\S]*?)```/g
-    const parts = text.split(codeBlockRegex)
-    
-    return parts.map((part, index) => {
-      if (index % 2 === 1) {
-        // This is a code block - apply highlighting inside code blocks too
-        const highlightedCode = searchTerm ? highlightText(part, searchTerm, true) : part
-        return (
-          <pre key={index} className="bg-gray-900 text-gray-100 p-3 rounded-md my-2 max-w-full overflow-hidden">
-            <code className="text-sm break-words whitespace-pre-wrap">{highlightedCode}</code>
-          </pre>
-        )
-      } else {
-        // This is regular text, process inline code and highlight
-        const inlineCodeRegex = /`([^`]+)`/g
-        const textParts = part.split(inlineCodeRegex)
-        
-        return textParts.map((textPart, textIndex) => {
-          if (textIndex % 2 === 1) {
-            // This is inline code - apply highlighting inside inline code too
-            const highlightedInlineCode = searchTerm ? highlightText(textPart, searchTerm, true) : textPart
-            return (
-              <code key={textIndex} className="bg-gray-700 text-gray-200 px-1 py-0.5 rounded text-sm font-mono break-words">
-                {highlightedInlineCode}
-              </code>
-            )
-          } else {
-            // This is regular text, apply highlighting
-            return searchTerm ? highlightText(textPart, searchTerm, false) : textPart
-          }
-        })
-      }
-    })
-  }
 
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
@@ -456,7 +400,7 @@ export function SearchPage() {
               {showMessages && (
                 <div className="space-y-3">
                   {filteredMessages.map((message, index) => (
-                    <MessageCard key={index} message={message} highlightText={renderSlackText} searchTerm={searchQuery} />
+                    <MessageCard key={index} message={message} searchTerm={searchQuery} />
                   ))}
                 </div>
               )}
@@ -483,7 +427,7 @@ export function SearchPage() {
               {showFiles && (
                 <div className="space-y-3">
                   {filteredFiles.map((file, index) => (
-                    <FileCard key={index} file={file} highlightText={highlightText} searchTerm={searchQuery} />
+                    <FileCard key={index} file={file} searchTerm={searchQuery} />
                   ))}
                 </div>
               )}

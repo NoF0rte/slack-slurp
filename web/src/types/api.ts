@@ -88,14 +88,21 @@ export interface SecretScanResult {
   status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
 }
 
+export interface Secret {
+  raw: string
+  verified: boolean
+}
+
 export interface SecretResult {
+  id: string
   detector: string
-  secret: string
+  secrets: Secret[]
   context: string
   channel: string
   user: string
   timestamp: string
   verified: boolean
+  false_positive: boolean
 }
 
 export interface CustomDetector {
