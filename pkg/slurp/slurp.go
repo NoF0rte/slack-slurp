@@ -68,34 +68,34 @@ type Channel struct {
 	ID               string         `json:"id"`
 	Name             string         `json:"name"`
 	Topic            string         `json:"topic"`
-	IsChannel        bool           `json:"is_channel"`
-	IsArchived       bool           `json:"is_archived"`
-	IsPrivate        bool           `json:"is_private"`
-	IsDM             bool           `json:"is_im"`
-	IsGroupMessage   bool           `json:"is_mpim"`
-	IsExternal       bool           `json:"is_external"`
-	NumMembers       int            `json:"num_members"`
+	IsChannel        bool           `json:"isChannel"`
+	IsArchived       bool           `json:"isArchived"`
+	IsPrivate        bool           `json:"isPrivate"`
+	IsDM             bool           `json:"isIm"`
+	IsGroupMessage   bool           `json:"isMpim"`
+	IsExternal       bool           `json:"isExternal"`
+	NumMembers       int            `json:"numMembers"`
 	Created          slack.JSONTime `json:"created"`
 	Latest           slack.JSONTime `json:"latest"`
-	SharedTeams      []Team         `json:"shared_teams"`
-	ConnectedTeamIDs []string       `json:"connected_team_ids"`
-	InternalTeamIDs  []string       `json:"internal_team_ids"`
+	SharedTeams      []Team         `json:"sharedTeams"`
+	ConnectedTeamIDs []string       `json:"connectedTeamIds"`
+	InternalTeamIDs  []string       `json:"internalTeamIds"`
 }
 
 type User struct {
-	FirstName     string `json:"first_name"`
-	LastName      string `json:"last_name"`
-	FullName      string `json:"real_name"`
+	FirstName     string `json:"firstName"`
+	LastName      string `json:"lastName"`
+	FullName      string `json:"realName"`
 	Email         string `json:"email"`
 	Username      string `json:"name"`
 	Image         string `json:"image"`
 	Phone         string `json:"phone"`
 	Title         string `json:"title"`
-	IsAdmin       bool   `json:"is_admin"`
-	IsBot         bool   `json:"is_bot"`
-	IsOwner       bool   `json:"is_owner"`
-	Has2FA        bool   `json:"has_2fa"`
-	TwoFactorType string `json:"two_factor_type"`
+	IsAdmin       bool   `json:"isAdmin"`
+	IsBot         bool   `json:"isBot"`
+	IsOwner       bool   `json:"isOwner"`
+	Has2FA        bool   `json:"has2fa"`
+	TwoFactorType string `json:"twoFactorType"`
 	Deleted       bool   `json:"deleted"`
 }
 
@@ -223,7 +223,7 @@ func SecretsVerify(verify bool) SecretOption {
 
 type Slurper struct {
 	client    *slack.Client
-	config    *Config
+	config    IConfig
 	detectors []detectors.Detector
 }
 
@@ -256,10 +256,11 @@ func newSlackHTTPClient(dCookie string, dsCookie string) *http.Client {
 }
 
 // New returns a new Slurper instance
-func New(cfg *Config) Slurper {
-	client := newSlackHTTPClient(cfg.DCookie, cfg.DSCookie)
+func New(cfg IConfig) Slurper {
+	apiToken, dCookie, dsCookie := cfg.GetCreds()
+	client := newSlackHTTPClient(dCookie, dsCookie)
 	return Slurper{
-		client:    slack.New(cfg.APIToken, slack.OptionHTTPClient(client)),
+		client:    slack.New(apiToken, slack.OptionHTTPClient(client)),
 		config:    cfg,
 		detectors: cfg.GetDetectors(),
 	}
@@ -275,10 +276,19 @@ func (s Slurper) AuthTest() (*slack.AuthTestResponse, error) {
 	return resp, nil
 }
 
+func (s *Slurper) TestCreds(apiToken string, dCookie string, dsCookie string) *slack.AuthTestResponse {
+	c := newSlackHTTPClient(dCookie, dsCookie)
+	client := slack.New(apiToken, slack.OptionHTTPClient(c))
+
+	resp, err := client.AuthTest()
+	if err != nil {
+		return nil
+	}
+	return resp
+}
+
 func (s *Slurper) UpdateCreds(apiToken string, dCookie string, dsCookie string) {
-	s.config.APIToken = apiToken
-	s.config.DCookie = dCookie
-	s.config.DSCookie = dsCookie
+	// s.config.SetCreds(apiToken, dCookie, dsCookie)
 
 	client := newSlackHTTPClient(dCookie, dsCookie)
 	s.client = slack.New(apiToken, slack.OptionHTTPClient(client))
@@ -481,7 +491,7 @@ func (s Slurper) SearchMessagesAsyncWithContext(ctx context.Context, query strin
 			}
 		}
 
-		for i := 1; i <= s.config.Threads; i++ {
+		for i := 1; i <= s.config.Threadss(); i++ {
 			// If thread count is greater than page count, go with page count
 			if current > count {
 				break
@@ -686,7 +696,7 @@ func (s Slurper) SearchFilesAsyncWithContext(ctx context.Context, query string, 
 			}
 		}
 
-		for i := 1; i <= s.config.Threads; i++ {
+		for i := 1; i <= s.config.Threadss(); i++ {
 			// If thread count is greater than page count, go with page count
 			if current > count {
 				break
@@ -797,7 +807,7 @@ func (s Slurper) GetSecretsAsyncWithContext(ctx context.Context, opts ...SecretO
 	go func() {
 		defer close(secretChan)
 
-		nonStarSearchableRe := regexp.MustCompile(`(-|\.|_)$`)
+		nonStarSearchableRe := regexp.MustCompile(`-|\.|_`) // it appears that Slack has issues with star searches with keywords that have -, ., or _
 		for _, detector := range selectedDetectors {
 			// Check for cancellation before processing each detector
 			select {
@@ -808,8 +818,7 @@ func (s Slurper) GetSecretsAsyncWithContext(ctx context.Context, opts ...SecretO
 			}
 
 			var err error
-			keywords := detector.Keywords()
-			for _, keyword := range keywords {
+			for _, keyword := range detector.Keywords() {
 				// Check for cancellation before processing each keyword
 				select {
 				case <-ctx.Done():
@@ -927,11 +936,7 @@ func (s Slurper) GetDomainsAsyncWithContext(ctx context.Context, domains []strin
 	domainChan := make(chan string)
 	errorChan := make(chan error)
 
-	selectedDomains := s.config.Domains
-	if len(domains) != 0 {
-		selectedDomains = domains
-	}
-
+	selectedDomains := domains
 	go func() {
 		defer close(domainChan)
 

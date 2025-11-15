@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/NoF0rte/slack-slurp/internal/database"
 	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/gin-gonic/gin"
@@ -23,19 +23,15 @@ import (
 
 // APIHandler handles HTTP requests for the API
 type APIHandler struct {
-	slurper slurp.Slurper
-	config  *slurp.Config
-	hub     *websocket.Hub
+	slurper   slurp.Slurper
+	dbContext *DBContext
+	hub       *websocket.Hub
 	// Context for cancelling channel loading operations
 	channelCtx    context.Context
 	channelCancel context.CancelFunc
 
 	mu        sync.RWMutex
 	searchMap map[string]context.CancelFunc
-
-	// Custom detector storage
-	customDetectorsPath string
-	customDetectorsMu   sync.RWMutex
 }
 
 type SearchFiltersRequest struct {
@@ -82,22 +78,23 @@ type SecretScanRequest struct {
 	SearchFiltersRequest
 	Detectors    []string `json:"detectors"`
 	Verify       bool     `json:"verify"`
-	VerifiedOnly bool     `json:"verified_only"`
+	VerifiedOnly bool     `json:"verifiedOnly"`
 }
 
 type DetectorInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	IsCustom    bool   `json:"is_custom"`
+	IsCustom    bool   `json:"isCustom"`
 }
 
 type CustomDetector struct {
+	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Keywords    []string `json:"keywords"`
 	Patterns    []string `json:"patterns"`
 	Description string   `json:"description"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
+	CreatedAt   string   `json:"createdAt"`
+	UpdatedAt   string   `json:"updatedAt"`
 }
 
 type CreateCustomDetectorRequest struct {
@@ -117,8 +114,8 @@ type UpdateCustomDetectorRequest struct {
 type SearchRequest struct {
 	SearchFiltersRequest
 	Query      string   `json:"query"`
-	FileTypes  []string `json:"file_types,omitempty"`
-	SearchType string   `json:"search_type"` // "messages", "files", "both"
+	FileTypes  []string `json:"filetypes,omitempty"`
+	SearchType string   `json:"searchType"` // "messages", "files", "both"
 }
 
 type DomainResult struct {
@@ -126,17 +123,17 @@ type DomainResult struct {
 }
 
 type DomainSearchResponse struct {
-	SearchID        string   `json:"search_id"`
+	SearchID        string   `json:"searchId"`
 	Status          string   `json:"status"`
-	TotalFound      int      `json:"total_found,omitempty"`
-	DomainsSearched []string `json:"domains_searched,omitempty"`
+	TotalFound      int      `json:"totalFound,omitempty"`
+	DomainsSearched []string `json:"domainsSearched,omitempty"`
 }
 
 type SearchResponse struct {
-	SearchID   string `json:"search_id"`
+	SearchID   string `json:"searchId"`
 	Status     string `json:"status"`
 	Query      string `json:"query"`
-	SearchType string `json:"search_type"`
+	SearchType string `json:"searchType"`
 }
 
 type MessageResult struct {
@@ -159,7 +156,7 @@ type FileResult struct {
 
 type WSMessage struct {
 	ID   string      `json:"id,omitempty"`
-	Type string      `json:"type"` // "connected", "error", "complete", "domain_result", "url_result", "message_result", "file_result"
+	Type string      `json:"type"` // "connected", "error", "complete", "domainResult", "urlResult", "messageResult", "fileResult"
 	Data interface{} `json:"data"`
 }
 
@@ -175,41 +172,83 @@ func (h *APIHandler) TestAuth(c *gin.Context) {
 }
 
 func (h *APIHandler) SetupAuth(c *gin.Context) {
-	var creds struct {
-		APIToken string `json:"api_token"`
-		DCookie  string `json:"d_cookie"`
-		DSCookie string `json:"ds_cookie"`
+	var req struct {
+		APIToken string `json:"apiToken"`
+		DCookie  string `json:"dCookie"`
+		DSCookie string `json:"dsCookie"`
+		Name     string `json:"name"`
 	}
 
-	if err := c.ShouldBindJSON(&creds); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Update config
-	h.slurper.UpdateCreds(creds.APIToken, creds.DCookie, creds.DSCookie)
-
-	// Test the credentials
-	authTest, err := h.slurper.AuthTest()
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials: " + err.Error()})
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Profile name is required"})
 		return
 	}
 
-	c.JSON(http.StatusOK, authTest)
-}
-
-func (h *APIHandler) GetConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, h.config)
-}
-
-func (h *APIHandler) UpdateConfig(c *gin.Context) {
-	if err := c.ShouldBindJSON(h.config); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// Update config temporarily to test credentials
+	user := h.slurper.TestCreds(req.APIToken, req.DCookie, req.DSCookie)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
+	// If we have a profiles repo, create/update the profile
+	if h.dbContext != nil && h.dbContext.profiles != nil {
+		// Check if profile with this name already exists
+		existing, err := h.dbContext.profiles.GetByName(req.Name)
+		if err != nil && err.Error() != "profile with ID 0 not found" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing profile: " + err.Error()})
+			return
+		}
+
+		var profile *database.Profile
+		if existing != nil {
+			// Update existing profile
+			existing.APIToken = req.APIToken
+			existing.DCookie = req.DCookie
+			existing.DSCookie = req.DSCookie
+			if err := h.dbContext.profiles.Update(existing); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile: " + err.Error()})
+				return
+			}
+			profile = existing
+		} else {
+			// Check if this will be the first profile - if so, set as selected
+			count, err := h.dbContext.profiles.Count()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count profiles: " + err.Error()})
+				return
+			}
+
+			// Create new profile
+			profile = &database.Profile{
+				Name:       req.Name,
+				APIToken:   req.APIToken,
+				DCookie:    req.DCookie,
+				DSCookie:   req.DSCookie,
+				IsSelected: count == 0, // First profile is automatically selected
+			}
+
+			if err := h.dbContext.profiles.Create(profile); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create profile: " + err.Error()})
+				return
+			}
+		}
+
+		// If this profile was set as selected, update the slurper
+		if profile.IsSelected {
+			h.slurper.UpdateCreds(profile.APIToken, profile.DCookie, profile.DSCookie)
+		}
+	} else {
+		// Fallback: update config directly if no database
+		h.slurper.UpdateCreds(req.APIToken, req.DCookie, req.DSCookie)
+	}
+
+	c.JSON(http.StatusOK, user)
 }
 
 // Core operation endpoints
@@ -364,8 +403,8 @@ func (h *APIHandler) SearchURLs(c *gin.Context) {
 	go h.runURLSearch(ctx, searchID, searchOptions)
 
 	c.JSON(http.StatusOK, gin.H{
-		"search_id": searchID,
-		"status":    "started",
+		"searchId": searchID,
+		"status":   "started",
 	})
 }
 
@@ -484,7 +523,7 @@ func (h *APIHandler) StartSecretScan(c *gin.Context) {
 	h.searchMap[scanID] = cancel
 	h.mu.Unlock()
 
-	selectedDetectors := h.config.GetDetectors(req.Detectors...)
+	selectedDetectors := h.dbContext.GetDetectors(req.Detectors...)
 
 	// Create secret options
 	secretOptions := []slurp.SecretOption{
@@ -524,8 +563,8 @@ func (h *APIHandler) StartSecretScan(c *gin.Context) {
 	go h.runSecretScan(ctx, scanID, secretOptions)
 
 	c.JSON(http.StatusOK, gin.H{
-		"scan_id": scanID,
-		"status":  "started",
+		"scanId": scanID,
+		"status": "started",
 	})
 }
 
@@ -543,8 +582,8 @@ func (h *APIHandler) GetScanStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"scan_id": scanID,
-		"status":  status,
+		"scanId": scanID,
+		"status": status,
 	})
 }
 
@@ -599,244 +638,448 @@ func (h *APIHandler) GetBuiltInDetectors(c *gin.Context) {
 	c.JSON(http.StatusOK, detectorInfos)
 }
 
-// GetCustomDetectors returns all custom detectors
-// func (h *APIHandler) GetCustomDetectors(c *gin.Context) {
-// 	detectors, err := h.loadCustomDetectors()
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
-// 		return
-// 	}
+// GetCustomDetectors returns all custom detectors from the database
+func (h *APIHandler) GetCustomDetectors(c *gin.Context) {
+	repo := h.dbContext.detectors
+	if repo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
 
-// 	c.JSON(http.StatusOK, detectors)
-// }
+	dbDetectors, err := repo.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
+		return
+	}
+
+	// Convert database models to API response format
+	var detectors []CustomDetector
+	for _, dbDet := range dbDetectors {
+		detectors = append(detectors, CustomDetector{
+			ID:          fmt.Sprintf("%d", dbDet.ID),
+			Name:        dbDet.Name,
+			Keywords:    []string(dbDet.Keywords),
+			Patterns:    []string(dbDet.Patterns),
+			Description: dbDet.Description,
+			CreatedAt:   dbDet.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   dbDet.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+
+	c.JSON(http.StatusOK, detectors)
+}
 
 // CreateCustomDetector creates a new custom detector
-// func (h *APIHandler) CreateCustomDetector(c *gin.Context) {
-// 	var req CreateCustomDetectorRequest
-// 	if err := c.ShouldBindJSON(&req); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-// 		return
-// 	}
-
-// 	// Validate request
-// 	if req.Name == "" {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
-// 		return
-// 	}
-// 	if req.Description == "" {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Description is required"})
-// 		return
-// 	}
-// 	if len(req.Keywords) == 0 {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one keyword is required"})
-// 		return
-// 	}
-// 	if len(req.Patterns) == 0 {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one regex pattern is required"})
-// 		return
-// 	}
-
-// 	// Validate regex patterns
-// 	for i, pattern := range req.Patterns {
-// 		if _, err := regexp.Compile(pattern); err != nil {
-// 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid regex pattern at index %d: %s", i, err.Error())})
-// 			return
-// 		}
-// 	}
-
-// 	// Load existing detectors
-// 	detectors, err := h.loadCustomDetectors()
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
-// 		return
-// 	}
-
-// 	// Check for duplicate name
-// 	for _, detector := range detectors {
-// 		if detector.Name == req.Name {
-// 			c.JSON(http.StatusBadRequest, gin.H{"error": "A detector with this name already exists"})
-// 			return
-// 		}
-// 	}
-
-// 	// Create new detector
-// 	now := time.Now().Format(time.RFC3339)
-// 	detector := CustomDetector{
-// 		Name:        req.Name,
-// 		Keywords:    req.Keywords,
-// 		Patterns:    req.Patterns,
-// 		Description: req.Description,
-// 		CreatedAt:   now,
-// 		UpdatedAt:   now,
-// 	}
-
-// 	// Add to list and save
-// 	detectors = append(detectors, detector)
-// 	if err := h.saveCustomDetectors(detectors); err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save custom detector: " + err.Error()})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusCreated, detector)
-// }
-
-// UpdateCustomDetector updates an existing custom detector
-// func (h *APIHandler) UpdateCustomDetector(c *gin.Context) {
-// 	oldDetectorName := c.Param("name")
-
-// 	var req UpdateCustomDetectorRequest
-// 	if err := c.ShouldBindJSON(&req); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-// 		return
-// 	}
-
-// 	// Load existing detectors
-// 	detectors, err := h.loadCustomDetectors()
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
-// 		return
-// 	}
-
-// 	// Find detector
-// 	var detector *CustomDetector
-// 	for _, d := range detectors {
-// 		if d.Name == oldDetectorName {
-// 			detector = &d
-// 			break
-// 		}
-// 	}
-
-// 	if detector == nil {
-// 		c.JSON(http.StatusNotFound, gin.H{"error": "Custom detector not found"})
-// 		return
-// 	}
-
-// 	// Update fields
-// 	if req.Name != nil {
-// 		// Check for duplicate name
-// 		for _, d := range detectors {
-// 			if d.Name != oldDetectorName && d.Name == *req.Name {
-// 				c.JSON(http.StatusBadRequest, gin.H{"error": "A detector with this name already exists"})
-// 				return
-// 			}
-// 		}
-// 		detector.Name = *req.Name
-// 	}
-// 	if req.Description != nil {
-// 		detector.Description = *req.Description
-// 	}
-// 	if req.Keywords != nil {
-// 		detector.Keywords = req.Keywords
-// 	}
-// 	if req.Patterns != nil {
-// 		// Validate regex patterns
-// 		for i, pattern := range req.Patterns {
-// 			if _, err := regexp.Compile(pattern); err != nil {
-// 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid regex pattern at index %d: %s", i, err.Error())})
-// 				return
-// 			}
-// 		}
-// 		detector.Patterns = req.Patterns
-// 	}
-
-// 	detector.UpdatedAt = time.Now().Format(time.RFC3339)
-
-// 	// Save updated detectors
-// 	if err := h.saveCustomDetectors(detectors); err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save custom detector: " + err.Error()})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, detector)
-// }
-
-// DeleteCustomDetector deletes a custom detector
-// func (h *APIHandler) DeleteCustomDetector(c *gin.Context) {
-// 	detectorID := c.Param("id")
-
-// 	// Load existing detectors
-// 	detectors, err := h.loadCustomDetectors()
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load custom detectors: " + err.Error()})
-// 		return
-// 	}
-
-// 	// Find and remove detector
-// 	var found bool
-// 	for i, detector := range detectors {
-// 		if detector.ID == detectorID {
-// 			detectors = append(detectors[:i], detectors[i+1:]...)
-// 			found = true
-// 			break
-// 		}
-// 	}
-
-// 	if !found {
-// 		c.JSON(http.StatusNotFound, gin.H{"error": "Custom detector not found"})
-// 		return
-// 	}
-
-// 	// Save updated detectors
-// 	if err := h.saveCustomDetectors(detectors); err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save custom detector: " + err.Error()})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, gin.H{"message": "Custom detector deleted successfully"})
-// }
-
-// Helper functions for custom detector storage
-
-func (h *APIHandler) getCustomDetectorsPath() string {
-	if h.customDetectorsPath == "" {
-		// Use current directory for now, in production this should be configurable
-		h.customDetectorsPath = filepath.Join(".", "custom_detectors.json")
+func (h *APIHandler) CreateCustomDetector(c *gin.Context) {
+	repo := h.dbContext.detectors
+	if repo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
 	}
-	return h.customDetectorsPath
+
+	var req CreateCustomDetectorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate request
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+		return
+	}
+	if len(req.Keywords) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one keyword is required"})
+		return
+	}
+	if len(req.Patterns) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one regex pattern is required"})
+		return
+	}
+
+	// Validate regex patterns
+	for _, pattern := range req.Patterns {
+		if _, err := regexp.Compile(pattern); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid regex pattern '%s': %s", pattern, err.Error())})
+			return
+		}
+	}
+
+	// Check for duplicate name
+	if repo.Exists(req.Name, nil) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A detector with this name already exists"})
+		return
+	}
+
+	// Create new detector in database
+	dbDetector := &database.CustomDetector{
+		Name:        req.Name,
+		Keywords:    database.StringArray(req.Keywords),
+		Patterns:    database.StringArray(req.Patterns),
+		Description: req.Description,
+	}
+
+	if err := repo.Create(dbDetector); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create custom detector: " + err.Error()})
+		return
+	}
+
+	// Convert to API response format
+	detector := CustomDetector{
+		ID:          fmt.Sprintf("%d", dbDetector.ID),
+		Name:        dbDetector.Name,
+		Keywords:    []string(dbDetector.Keywords),
+		Patterns:    []string(dbDetector.Patterns),
+		Description: dbDetector.Description,
+		CreatedAt:   dbDetector.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   dbDetector.UpdatedAt.Format(time.RFC3339),
+	}
+
+	c.JSON(http.StatusCreated, detector)
 }
 
-func (h *APIHandler) loadCustomDetectors() ([]CustomDetector, error) {
-	h.customDetectorsMu.RLock()
-	defer h.customDetectorsMu.RUnlock()
-
-	path := h.getCustomDetectorsPath()
-
-	// Check if file exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return []CustomDetector{}, nil
+// UpdateCustomDetector updates an existing custom detector by ID
+func (h *APIHandler) UpdateCustomDetector(c *gin.Context) {
+	repo := h.dbContext.detectors
+	if repo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
 	}
 
-	data, err := os.ReadFile(path)
+	detectorIDStr := c.Param("id")
+	detectorID, err := strconv.ParseUint(detectorIDStr, 10, 32)
 	if err != nil {
-		return nil, err
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid detector ID"})
+		return
 	}
 
-	var detectors []CustomDetector
-	if err := json.Unmarshal(data, &detectors); err != nil {
-		return nil, err
+	var req UpdateCustomDetectorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	return detectors, nil
+	// Get existing detector
+	dbDetector, err := repo.GetByID(uint(detectorID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Custom detector not found"})
+		return
+	}
+
+	// Update fields if provided
+	if req.Name != nil {
+		// Check for duplicate name (excluding current detector)
+		excludeID := uint(detectorID)
+		if repo.Exists(*req.Name, &excludeID) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "A detector with this name already exists"})
+			return
+		}
+		dbDetector.Name = *req.Name
+	}
+	if req.Description != nil {
+		dbDetector.Description = *req.Description
+	}
+	if req.Keywords != nil {
+		dbDetector.Keywords = database.StringArray(req.Keywords)
+	}
+	if req.Patterns != nil {
+		// Validate regex patterns
+		for i, pattern := range req.Patterns {
+			if _, err := regexp.Compile(pattern); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid regex pattern at index %d: %s", i, err.Error())})
+				return
+			}
+		}
+		dbDetector.Patterns = database.StringArray(req.Patterns)
+	}
+
+	// Update in database
+	if err := repo.Update(dbDetector); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update custom detector: " + err.Error()})
+		return
+	}
+
+	// Convert to API response format
+	detector := CustomDetector{
+		ID:          fmt.Sprintf("%d", dbDetector.ID),
+		Name:        dbDetector.Name,
+		Keywords:    []string(dbDetector.Keywords),
+		Patterns:    []string(dbDetector.Patterns),
+		Description: dbDetector.Description,
+		CreatedAt:   dbDetector.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   dbDetector.UpdatedAt.Format(time.RFC3339),
+	}
+
+	c.JSON(http.StatusOK, detector)
 }
 
-func (h *APIHandler) saveCustomDetectors(detectors []CustomDetector) error {
-	h.customDetectorsMu.Lock()
-	defer h.customDetectorsMu.Unlock()
-
-	path := h.getCustomDetectorsPath()
-
-	// Ensure directory exists
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+// DeleteCustomDetector deletes a custom detector by ID
+func (h *APIHandler) DeleteCustomDetector(c *gin.Context) {
+	repo := h.dbContext.detectors
+	if repo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
 	}
 
-	data, err := json.MarshalIndent(detectors, "", "  ")
+	detectorIDStr := c.Param("id")
+	detectorID, err := strconv.ParseUint(detectorIDStr, 10, 32)
 	if err != nil {
-		return err
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid detector ID"})
+		return
 	}
 
-	return os.WriteFile(path, data, 0644)
+	// Verify detector exists
+	_, err = repo.GetByID(uint(detectorID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Custom detector not found"})
+		return
+	}
+
+	// Delete from database
+	if err := repo.Delete(uint(detectorID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete custom detector: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Custom detector deleted successfully"})
+}
+
+// Profile Management endpoints
+
+// GetProfiles returns all profiles
+func (h *APIHandler) GetProfiles(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.profiles == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	profiles, err := h.dbContext.profiles.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load profiles: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, profiles)
+}
+
+// GetProfilesCount returns the count of profiles
+func (h *APIHandler) GetProfilesCount(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.profiles == nil {
+		c.JSON(http.StatusOK, gin.H{"count": 0})
+		return
+	}
+
+	count, err := h.dbContext.profiles.Count()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count profiles: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"count": count})
+}
+
+// CreateProfile creates a new profile
+func (h *APIHandler) CreateProfile(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.profiles == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	var req struct {
+		Name     string `json:"name"`
+		APIToken string `json:"apiToken"`
+		DCookie  string `json:"dCookie"`
+		DSCookie string `json:"dsCookie"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+		return
+	}
+
+	if req.APIToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "API token is required"})
+		return
+	}
+
+	// Check for duplicate name
+	if h.dbContext.profiles.Exists(req.Name, nil) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A profile with this name already exists"})
+		return
+	}
+
+	// Check if this will be the first profile
+	count, err := h.dbContext.profiles.Count()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count profiles: " + err.Error()})
+		return
+	}
+
+	profile := &database.Profile{
+		Name:       req.Name,
+		APIToken:   req.APIToken,
+		DCookie:    req.DCookie,
+		DSCookie:   req.DSCookie,
+		IsSelected: count == 0, // First profile is automatically selected
+	}
+
+	if err := h.dbContext.profiles.Create(profile); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create profile: " + err.Error()})
+		return
+	}
+
+	// If this is the first profile, update slurper
+	if profile.IsSelected {
+		h.slurper.UpdateCreds(profile.APIToken, profile.DCookie, profile.DSCookie)
+	}
+
+	c.JSON(http.StatusCreated, profile)
+}
+
+// UpdateProfile updates an existing profile
+func (h *APIHandler) UpdateProfile(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.profiles == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	profileIDStr := c.Param("id")
+	profileID, err := strconv.ParseUint(profileIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid profile ID"})
+		return
+	}
+
+	var req struct {
+		Name     *string `json:"name,omitempty"`
+		APIToken *string `json:"apiToken,omitempty"`
+		DCookie  *string `json:"dCookie,omitempty"`
+		DSCookie *string `json:"dsCookie,omitempty"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get existing profile
+	profile, err := h.dbContext.profiles.GetByID(uint(profileID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Profile not found"})
+		return
+	}
+
+	// Update fields if provided
+	if req.Name != nil {
+		// Check for duplicate name
+		excludeID := uint(profileID)
+		if h.dbContext.profiles.Exists(*req.Name, &excludeID) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "A profile with this name already exists"})
+			return
+		}
+		profile.Name = *req.Name
+	}
+	if req.APIToken != nil {
+		profile.APIToken = *req.APIToken
+	}
+	if req.DCookie != nil {
+		profile.DCookie = *req.DCookie
+	}
+	if req.DSCookie != nil {
+		profile.DSCookie = *req.DSCookie
+	}
+
+	// Update in database
+	if err := h.dbContext.profiles.Update(profile); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile: " + err.Error()})
+		return
+	}
+
+	// If this profile is selected, update slurper
+	if profile.IsSelected {
+		h.slurper.UpdateCreds(profile.APIToken, profile.DCookie, profile.DSCookie)
+	}
+
+	c.JSON(http.StatusOK, profile)
+}
+
+// DeleteProfile deletes a profile by ID
+func (h *APIHandler) DeleteProfile(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.profiles == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	profileIDStr := c.Param("id")
+	profileID, err := strconv.ParseUint(profileIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid profile ID"})
+		return
+	}
+
+	// Get profile to check if it's selected
+	profile, err := h.dbContext.profiles.GetByID(uint(profileID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Profile not found"})
+		return
+	}
+
+	// Delete from database
+	if err := h.dbContext.profiles.Delete(uint(profileID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete profile: " + err.Error()})
+		return
+	}
+
+	// If deleted profile was selected, select the first available profile
+	if profile.IsSelected {
+		profiles, err := h.dbContext.profiles.List()
+		if err == nil && len(profiles) > 0 {
+			// Select the first profile
+			if err := h.dbContext.profiles.SetSelected(profiles[0].ID); err == nil {
+				h.slurper.UpdateCreds(profiles[0].APIToken, profiles[0].DCookie, profiles[0].DSCookie)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Profile deleted successfully"})
+}
+
+// SelectProfile sets a profile as selected
+func (h *APIHandler) SelectProfile(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.profiles == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	profileIDStr := c.Param("id")
+	profileID, err := strconv.ParseUint(profileIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid profile ID"})
+		return
+	}
+
+	// Verify profile exists
+	profile, err := h.dbContext.profiles.GetByID(uint(profileID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Profile not found"})
+		return
+	}
+
+	// Set as selected
+	if err := h.dbContext.profiles.SetSelected(uint(profileID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to select profile: " + err.Error()})
+		return
+	}
+
+	// Update slurper with new credentials
+	h.slurper.UpdateCreds(profile.APIToken, profile.DCookie, profile.DSCookie)
+
+	c.JSON(http.StatusOK, profile)
 }
 
 func (h *APIHandler) HandleWebSocket(c *gin.Context) {
@@ -845,11 +1088,11 @@ func (h *APIHandler) HandleWebSocket(c *gin.Context) {
 
 // Helper functions
 func generateScanID() string {
-	return fmt.Sprintf("scan_%d", time.Now().Unix())
+	return fmt.Sprintf("scan%d", time.Now().Unix())
 }
 
 func generateSearchID() string {
-	return fmt.Sprintf("search_%d", time.Now().Unix())
+	return fmt.Sprintf("search%d", time.Now().Unix())
 }
 
 func (h *APIHandler) runSecretScan(ctx context.Context, scanID string, secretOptions []slurp.SecretOption) {
@@ -876,7 +1119,7 @@ Loop:
 			}
 
 			h.sendWebSocketMessage(WSMessage{
-				Type: "secret_result",
+				Type: "secretResult",
 				ID:   scanID,
 				Data: map[string]interface{}{
 					"detector":  result.Type,
@@ -937,7 +1180,7 @@ Loop:
 			totalFound++
 
 			h.sendWebSocketMessage(WSMessage{
-				Type: "domain_result",
+				Type: "domainResult",
 				ID:   searchID,
 				Data: DomainResult{
 					Domain: domain,
@@ -964,8 +1207,8 @@ Loop:
 		Type: "complete",
 		ID:   searchID,
 		Data: map[string]interface{}{
-			"total_found":      totalFound,
-			"domains_searched": domains,
+			"totalFound":      totalFound,
+			"domainsSearched": domains,
 		},
 	})
 }
@@ -996,7 +1239,7 @@ Loop:
 			totalFound++
 
 			h.sendWebSocketMessage(WSMessage{
-				Type: "url_result",
+				Type: "urlResult",
 				ID:   searchID,
 				Data: u,
 			})
@@ -1021,7 +1264,7 @@ Loop:
 		Type: "complete",
 		ID:   searchID,
 		Data: map[string]interface{}{
-			"total_found": totalFound,
+			"totalFound": totalFound,
 		},
 	})
 }
@@ -1119,7 +1362,7 @@ func (h *APIHandler) runChannelsDetailed(ctx context.Context, types []slurp.Chan
 
 			h.sendWebSocketMessage(WSMessage{
 				ID:   "channel",
-				Type: "channel_result",
+				Type: "channelResult",
 				Data: channel,
 			})
 
@@ -1161,7 +1404,7 @@ Loop:
 			}
 
 			h.sendWebSocketMessage(WSMessage{
-				Type: "message_result",
+				Type: "messageResult",
 				ID:   searchID,
 				Data: MessageResult{
 					User:    message.User,
@@ -1201,7 +1444,7 @@ Loop:
 			}
 
 			h.sendWebSocketMessage(WSMessage{
-				Type: "file_result",
+				Type: "fileResult",
 				ID:   searchID,
 				Data: FileResult{
 					ID:       file.Raw.ID,
@@ -1232,4 +1475,62 @@ func (h *APIHandler) sendWebSocketMessage(message WSMessage) {
 		return
 	}
 	h.hub.BroadcastToType("dashboard", data)
+}
+
+// GetGlobalSettings returns the global settings
+func (h *APIHandler) GetGlobalSettings(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.globalSettings == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	settings, err := h.dbContext.globalSettings.GetSettings()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, settings)
+}
+
+// UpdateGlobalSettings updates the global settings
+func (h *APIHandler) UpdateGlobalSettings(c *gin.Context) {
+	if h.dbContext == nil || h.dbContext.globalSettings == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database not initialized"})
+		return
+	}
+
+	var req struct {
+		ConcurrentGoroutines *int `json:"concurrentGoroutines,omitempty"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	settings, err := h.dbContext.globalSettings.GetSettings()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings: " + err.Error()})
+		return
+	}
+
+	if req.ConcurrentGoroutines != nil {
+		if *req.ConcurrentGoroutines < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Concurrent goroutines must be at least 1"})
+			return
+		}
+		if *req.ConcurrentGoroutines > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Concurrent goroutines cannot exceed 100"})
+			return
+		}
+		settings.ConcurrentGoroutines = *req.ConcurrentGoroutines
+	}
+
+	if err := h.dbContext.globalSettings.UpdateSettings(settings); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, settings)
 }

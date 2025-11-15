@@ -5,7 +5,6 @@ import { SecretResultCard } from './SecretResultCard'
 import { DetectorSelector } from './DetectorSelector'
 import { DetectorFilter } from './DetectorFilter'
 import { downloadJSON, generateFilename, getCurrentTimestamp } from '../../utils/export'
-import { ConfirmDialog } from '../common/ConfirmDialog'
 import { 
   MagnifyingGlassIcon, 
   ArrowPathIcon,
@@ -54,6 +53,8 @@ export function SecretsPage() {
   const [selectedDetectorFilters, setSelectedDetectorFilters] = useState<string[]>([])
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [exportData, setExportData] = useState<{ filename: string; data: any; timestamp: number } | null>(null)
+  const [includeFalsePositives, setIncludeFalsePositives] = useState(true)
+  const [includeNonVerified, setIncludeNonVerified] = useState(true)
 
   useEffect(() => {
     loadDetectors()
@@ -68,8 +69,7 @@ export function SecretsPage() {
     const request: any = {
       channels: selectedChannels,
       detectors: selectedDetectors,
-      verify,
-      verified_only: verifiedOnly
+      verify
     }
 
     if (selectedUsers.length > 0) {
@@ -93,19 +93,22 @@ export function SecretsPage() {
     const timestamp = getCurrentTimestamp()
     const filename = generateFilename('secrets', timestamp)
     
-    // Check if there are any false positives
-    const hasFalsePositives = results.some(result => result.false_positive)
+    // Check if there are any false positives or non-verified secrets
+    const hasFalsePositives = results.some(result => result.falsePositive)
+    const hasNonVerified = results.some(result => !result.verified)
     
-    if (hasFalsePositives) {
-      // Show dialog to ask about including false positives
+    if (hasFalsePositives || hasNonVerified) {
+      // Show dialog to ask about including false positives and non-verified
       setExportData({
         filename,
         data: results,
         timestamp
       })
+      setIncludeFalsePositives(true)
+      setIncludeNonVerified(true)
       setShowExportDialog(true)
     } else {
-      // No false positives, export all results directly
+      // No false positives or non-verified, export all results directly
       downloadJSON({
         filename,
         data: results,
@@ -113,12 +116,40 @@ export function SecretsPage() {
       })
     }
   }
+  
+  const handleExportConfirm = () => {
+    if (!exportData) return
+    
+    // Filter results based on checkboxes
+    let filteredData = exportData.data
+    
+    if (!includeFalsePositives) {
+      filteredData = filteredData.filter((result: any) => !result.falsePositive)
+    }
+    
+    if (!includeNonVerified) {
+      filteredData = filteredData.filter((result: any) => result.verified)
+    }
+    
+    downloadJSON({
+      ...exportData,
+      data: filteredData
+    })
+    
+    setShowExportDialog(false)
+    setExportData(null)
+  }
 
 
-  // Filter results based on search query, detector filters, and false positives
+  // Filter results based on search query, detector filters, false positives, and verified status
   const filteredResults = results.filter(result => {
     // Filter by false positives
-    if (hideFalsePositives && result.false_positive) {
+    if (hideFalsePositives && result.falsePositive) {
+      return false
+    }
+    
+    // Filter by verified status (client-side only)
+    if (verifiedOnly && !result.verified) {
       return false
     }
     
@@ -175,8 +206,8 @@ export function SecretsPage() {
       </div>
 
       {/* Stats and Scan Status */}
-      {results.length > 0 && (
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
+        {results.length > 0 && (
           <div className="flex items-center space-x-4">
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 inline-block">
               <div className="flex items-center">
@@ -188,8 +219,10 @@ export function SecretsPage() {
               </div>
             </div>
           </div>
+        )}
 
-          {/* Scan Status */}
+        {/* Scan Status - Right aligned */}
+        <div className="ml-auto">
           {isScanning && (
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -206,7 +239,7 @@ export function SecretsPage() {
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Detector Selection */}
       <DetectorSelector
@@ -246,20 +279,6 @@ export function SecretsPage() {
               Verify secrets (attempts to validate if secrets are real)
             </label>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="verifiedOnly"
-              checked={verifiedOnly}
-              onChange={(e) => setVerifiedOnly(e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="verifiedOnly" className="text-sm text-gray-300">
-              Only show verified secrets
-            </label>
-          </div>
-          
         </div>
         
         {/* Action Buttons */}
@@ -375,6 +394,25 @@ export function SecretsPage() {
                 />
               </button>
             </div>
+            
+            {/* Only Show Verified Secrets Toggle */}
+            <div className="flex items-center space-x-3 bg-gray-800 rounded-lg border border-gray-700 px-4 py-2">
+              <span className="text-sm text-gray-300 whitespace-nowrap">Only show verified secrets</span>
+              <button
+                onClick={() => setVerifiedOnly(!verifiedOnly)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
+                  verifiedOnly ? 'bg-blue-600' : 'bg-gray-600'
+                }`}
+                role="switch"
+                aria-checked={verifiedOnly}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    verifiedOnly ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
           
           {filteredResults.length > 0 ? (
@@ -417,44 +455,87 @@ export function SecretsPage() {
         </div>
       )}
       
-      {/* Export Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showExportDialog}
-        onClose={() => {
-          setShowExportDialog(false)
-          setExportData(null)
-        }}
-        onConfirm={() => {
-          if (exportData) {
-            downloadJSON(exportData)
-          }
-          setShowExportDialog(false)
-          setExportData(null)
-        }}
-        onDecline={() => {
-          if (exportData) {
-            const filteredResults = results.filter(result => !result.false_positive)
-            downloadJSON({
-              ...exportData,
-              data: filteredResults
-            })
-          }
-          setShowExportDialog(false)
-          setExportData(null)
-        }}
-        onCancel={() => {
-          setShowExportDialog(false)
-          setExportData(null)
-        }}
-        title="Export Results"
-        message={`Found ${results.filter(result => result.false_positive).length} false positive(s). Do you want to include them in the export?`}
-        confirmText="Yes"
-        declineText="No"
-        cancelText="Cancel"
-        confirmButtonColor="blue"
-        declineButtonColor="gray"
-        showCancelButton={true}
-      />
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed inset-0 bg-black opacity-50" onClick={() => {
+            setShowExportDialog(false)
+            setExportData(null)
+          }} />
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div
+              className="relative bg-gray-800 rounded-lg border border-gray-700 shadow-xl max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-gray-700">
+                <h3 className="text-lg font-semibold text-white">Export Results</h3>
+              </div>
+              
+              <div className="px-6 py-4">
+                <p className="text-gray-300 mb-4">
+                  Choose which results to include in the export:
+                </p>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="includeFalsePositives"
+                      checked={includeFalsePositives}
+                      onChange={(e) => setIncludeFalsePositives(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="includeFalsePositives" className="text-sm text-gray-300">
+                      Include false positives
+                      {exportData && (
+                        <span className="text-gray-500 ml-2">
+                          ({exportData.data.filter((r: any) => r.falsePositive).length} found)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="includeNonVerified"
+                      checked={includeNonVerified}
+                      onChange={(e) => setIncludeNonVerified(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="includeNonVerified" className="text-sm text-gray-300">
+                      Include non-verified secrets
+                      {exportData && (
+                        <span className="text-gray-500 ml-2">
+                          ({exportData.data.filter((r: any) => !r.verified).length} found)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="px-6 py-4 bg-gray-700 rounded-b-lg flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowExportDialog(false)
+                    setExportData(null)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-600 hover:bg-gray-500 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExportConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                >
+                  Export
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

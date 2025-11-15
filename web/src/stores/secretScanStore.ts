@@ -47,7 +47,7 @@ interface SecretScanState {
   
   // Detector management actions
   loadDetectors: () => Promise<void>
-  createCustomDetector: (detector: Omit<CustomDetector, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  createCustomDetector: (detector: Omit<CustomDetector, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
   updateCustomDetector: (id: string, detector: Partial<CustomDetector>) => Promise<void>
   deleteCustomDetector: (id: string) => Promise<void>
 }
@@ -92,7 +92,7 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
       const handleSecretResult = (id: string, data: SecretResult) => {
         const state = get()
         const currentScan = state.currentScan
-        if (!currentScan || currentScan.scan_id !== id) {
+        if (!currentScan || currentScan.scanId !== id) {
           return
         }
 
@@ -110,7 +110,7 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
       const handleComplete = (id: string) => {
         const state = get()
         const currentScan = state.currentScan
-        if (!currentScan || currentScan.scan_id !== id) {
+        if (!currentScan || currentScan.scanId !== id) {
           return
         }
         
@@ -124,7 +124,7 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('secret_result', handleSecretResult)
+        wsManager.off('secretResult', handleSecretResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
@@ -132,7 +132,7 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
       const handleError = (id: string, data: any) => {
         const state = get()
         const currentScan = state.currentScan
-        if (!currentScan || currentScan.scan_id !== id) {
+        if (!currentScan || currentScan.scanId !== id) {
           return
         }
 
@@ -143,13 +143,13 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('secret_result', handleSecretResult)
+        wsManager.off('secretResult', handleSecretResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
       
       // Add listeners
-      wsManager.on('secret_result', handleSecretResult)
+      wsManager.on('secretResult', handleSecretResult)
       wsManager.on('complete', handleComplete)
       wsManager.on('error', handleError)
       
@@ -182,7 +182,7 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
     const currentScan = get().currentScan
     if (currentScan) {
       // Send stop request to backend
-      api.post(`/secrets/scan/stop/${currentScan.scan_id}`).catch(console.error)
+      api.post(`/secrets/scan/stop/${currentScan.scanId}`).catch(console.error)
     }
     
     set({
@@ -236,7 +236,7 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
     set(state => ({
       results: state.results.map(result => 
         result.id === resultId 
-          ? { ...result, false_positive: !result.false_positive }
+          ? { ...result, falsePositive: !result.falsePositive }
           : result
       )
     }))
@@ -250,14 +250,14 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
     set({ isLoadingDetectors: true })
     
     try {
-      // const [detectorsResponse, customResponse] = await Promise.all([
-      //   api.get('/secrets/detectors'),
-      //   api.get('/secrets/custom-detectors')
-      // ])
-      const detectorsResponse = await api.get('/secrets/detectors')
+      const [builtinResponse, customResponse] = await Promise.all([
+        api.get('/secrets/detectors'),
+        api.get('/secrets/custom-detectors')
+      ])
       
       set({
-        builtinDetectors: detectorsResponse.data,
+        builtinDetectors: builtinResponse.data,
+        customDetectors: customResponse.data || [],
         isLoadingDetectors: false
       })
     } catch (error: any) {
@@ -268,35 +268,31 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
     }
   },
 
-  createCustomDetector: async (detector: Omit<CustomDetector, 'id' | 'created_at' | 'updated_at'>) => {
+  createCustomDetector: async (detector: Omit<CustomDetector, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const response = await api.post('/secrets/custom-detectors', detector)
-      const newDetector = response.data
+      await api.post('/secrets/custom-detectors', detector)
       
-      set(state => ({
-        customDetectors: [...state.customDetectors, newDetector]
-      }))
+      // Reload detectors to ensure sync
+      get().loadDetectors()
     } catch (error: any) {
       set({
         error: error.response?.data?.error || 'Failed to create custom detector'
       })
+      throw error
     }
   },
 
   updateCustomDetector: async (id: string, detector: Partial<CustomDetector>) => {
     try {
-      const response = await api.put(`/secrets/custom-detectors/${id}`, detector)
-      const updatedDetector = response.data
+      await api.put(`/secrets/custom-detectors/${id}`, detector)
       
-      set(state => ({
-        customDetectors: state.customDetectors.map(d => 
-          d.id === id ? updatedDetector : d
-        )
-      }))
+      // Reload detectors to ensure sync
+      get().loadDetectors()
     } catch (error: any) {
       set({
         error: error.response?.data?.error || 'Failed to update custom detector'
       })
+      throw error
     }
   },
 
@@ -304,13 +300,13 @@ export const useSecretScanStore = create<SecretScanState>((set, get) => ({
     try {
       await api.delete(`/secrets/custom-detectors/${id}`)
       
-      set(state => ({
-        customDetectors: state.customDetectors.filter(d => d.id !== id)
-      }))
+      // Reload detectors to ensure sync
+      get().loadDetectors()
     } catch (error: any) {
       set({
         error: error.response?.data?.error || 'Failed to delete custom detector'
       })
+      throw error
     }
   },
 }))

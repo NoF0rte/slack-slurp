@@ -37,13 +37,13 @@ export function UsersPage() {
     let passesFilter = true
     switch (selectedFilter) {
       case 'active':
-        passesFilter = !user.deleted && !user.is_bot
+        passesFilter = !user.deleted && !user.isBot
         break
       case 'bots':
-        passesFilter = user.is_bot
+        passesFilter = user.isBot
         break
       case 'admins':
-        passesFilter = user.is_admin || user.is_owner
+        passesFilter = user.isAdmin || user.isOwner
         break
       case 'deleted':
         passesFilter = user.deleted
@@ -61,7 +61,7 @@ export function UsersPage() {
     const query = searchQuery.toLowerCase()
     return (
       user.name?.toLowerCase().includes(query) ||
-      user.real_name?.toLowerCase().includes(query) ||
+      user.realName?.toLowerCase().includes(query) ||
       user.email?.toLowerCase().includes(query) ||
       user.title?.toLowerCase().includes(query)
     )
@@ -69,9 +69,9 @@ export function UsersPage() {
 
   const getUserStats = () => {
     const total = users.length
-    const active = users.filter(u => !u.deleted && !u.is_bot).length
-    const bots = users.filter(u => u.is_bot).length
-    const admins = users.filter(u => u.is_admin || u.is_owner).length
+    const active = users.filter(u => !u.deleted && !u.isBot).length
+    const bots = users.filter(u => u.isBot).length
+    const admins = users.filter(u => u.isAdmin || u.isOwner).length
     const deleted = users.filter(u => u.deleted).length
     
     return { total, active, bots, admins, deleted }

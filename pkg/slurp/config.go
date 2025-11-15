@@ -103,46 +103,64 @@ var (
 	}
 )
 
+type IConfig interface {
+	GetCreds() (string, string, string)
+	GetDetectors(detectrs ...string) []detectors.Detector
+	Threadss() int
+}
+
 type Config struct {
 	APIToken string `mapstructure:"api-token" json:"api_token"`
 	DCookie  string `mapstructure:"d-cookie" json:"d_cookie"`
 	DSCookie string `mapstructure:"ds-cookie" json:"ds_cookie"`
 	// Files       []string `mapstructure:"files"`
-	Domains         []string         `mapstructure:"domains" json:"domains"`
 	Detectors       []string         `mapstructure:"detectors" json:"detectors"`
 	Threads         int              `json:"threads"`
 	CustomDetectors []CustomDetector `mapstructure:"custom-detectors" json:"custom_detectors"`
 }
 
+func (c Config) Threadss() int {
+	return c.Threads
+}
+
+func (c Config) GetCreds() (string, string, string) {
+	return c.APIToken, c.DCookie, c.DSCookie
+}
+
+func (c *Config) SetCreds(token string, dCookie string, dsCookie string) {
+	c.APIToken = token
+	c.DCookie = dCookie
+	c.DSCookie = dsCookie
+}
+
 func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {
-	defaultDetectors := true
-	if len(detectrs) == 0 {
-		detectrs = c.Detectors
-		defaultDetectors = false
+	var selectedDetectors []detectors.Detector
+
+	if len(detectrs) == 0 { // This should mean we should use all builtin and custom detectors
+		for _, detector := range BuiltInDetectors {
+			selectedDetectors = append(selectedDetectors, detector)
+		}
+
+		for _, detector := range c.CustomDetectors {
+			selectedDetectors = append(selectedDetectors, &detector)
+		}
+
+		return selectedDetectors
 	}
 
-	var selectedDetectors []detectors.Detector
 	for _, t := range detectrs {
 		detector, ok := BuiltInDetectors[t]
-		if !ok {
-			if !defaultDetectors && len(c.CustomDetectors) != 0 {
-				for _, d := range c.CustomDetectors {
-					if strings.EqualFold(d.Name, t) {
-						selectedDetectors = append(selectedDetectors, &d)
-						break
-					}
+		if !ok && len(c.CustomDetectors) != 0 {
+			for _, d := range c.CustomDetectors {
+				if strings.EqualFold(d.Name, t) {
+					detector = &d
+					break
 				}
 			}
 		}
 
 		if detector != nil {
 			selectedDetectors = append(selectedDetectors, detector)
-		}
-	}
-
-	if defaultDetectors && len(c.CustomDetectors) != 0 {
-		for _, d := range c.CustomDetectors {
-			selectedDetectors = append(selectedDetectors, &d)
 		}
 	}
 

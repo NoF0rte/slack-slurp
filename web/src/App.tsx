@@ -3,15 +3,28 @@ import { Layout } from './components/layout/Layout'
 import { AuthSetup } from './components/auth/AuthSetup'
 import { Router } from './components/Router'
 import { useAuthStore } from './stores/authStore'
+import { useProfileStore } from './stores/profileStore'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
 
 function App() {
   const { isAuthenticated, testAuth } = useAuthStore()
+  const { getProfilesCount } = useProfileStore()
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [showAuthSetup, setShowAuthSetup] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
+      // First check if there are any profiles
+      const profileCount = await getProfilesCount()
+      
+      // If no profiles exist, show auth setup
+      if (profileCount === 0) {
+        setShowAuthSetup(true)
+        setIsCheckingAuth(false)
+        return
+      }
+
+      // If profiles exist, check authentication
       if (!isAuthenticated) {
         const result = await testAuth()
         if (!result.success) {
@@ -26,7 +39,7 @@ function App() {
     }
 
     checkAuth()
-  }, [isAuthenticated, testAuth])
+  }, [isAuthenticated, testAuth, getProfilesCount])
 
   if (isCheckingAuth) {
     return (

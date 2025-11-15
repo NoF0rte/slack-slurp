@@ -58,7 +58,7 @@ export const useURLsStore = create<URLsState>((set, get) => ({
       // Set up WebSocket listeners
       const handleURLResult = (id: string, data: string) => {
         const currentSearch = get().currentSearch
-        if (!currentSearch || currentSearch.search_id != id) {
+        if (!currentSearch || currentSearch.searchId != id) {
           return
         }
 
@@ -70,7 +70,7 @@ export const useURLsStore = create<URLsState>((set, get) => ({
       const handleComplete = (id: string) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id) {
+        if (!currentSearch || currentSearch.searchId != id) {
           return
         }
 
@@ -78,21 +78,21 @@ export const useURLsStore = create<URLsState>((set, get) => ({
           isSearching: false,
           isLoading: false,
           currentSearch: currentSearch ? {
-            search_id: currentSearch.search_id,
+            searchId: currentSearch.searchId,
             status: 'completed' as const,
-            total_found: state.results.length
+            totalFound: state.results.length
           } : null
         })
         
         // Clean up listeners
-        wsManager.off('url_result', handleURLResult)
+        wsManager.off('urlResult', handleURLResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
       
       const handleError = (id: string, data: any) => {
         const currentSearch = get().currentSearch
-        if (!currentSearch || currentSearch.search_id != id) {
+        if (!currentSearch || currentSearch.searchId != id) {
           return
         }
 
@@ -103,13 +103,13 @@ export const useURLsStore = create<URLsState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('url_result', handleURLResult)
+        wsManager.off('urlResult', handleURLResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
       
       // Add listeners
-      wsManager.on('url_result', handleURLResult)
+      wsManager.on('urlResult', handleURLResult)
       wsManager.on('complete', handleComplete)
       wsManager.on('error', handleError)
       
@@ -142,7 +142,7 @@ export const useURLsStore = create<URLsState>((set, get) => ({
     const currentSearch = get().currentSearch
     if (currentSearch) {
       // Send stop request to backend
-      api.post(`/search/stop/${currentSearch.search_id}`).catch(console.error)
+      api.post(`/search/stop/${currentSearch.searchId}`).catch(console.error)
     }
     
     set({

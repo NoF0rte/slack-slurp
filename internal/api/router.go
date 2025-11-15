@@ -3,20 +3,30 @@ package api
 import (
 	"context"
 
+	"github.com/NoF0rte/slack-slurp/internal/database"
 	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/NoF0rte/slack-slurp/pkg/slurp"
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRoutes configures all API routes
-func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub *websocket.Hub) {
+func SetupRoutes(r *gin.Engine, hub *websocket.Hub) {
 	// Create API handler
 	handler := &APIHandler{
-		slurper:   slurper,
-		config:    config,
 		hub:       hub,
 		searchMap: make(map[string]context.CancelFunc),
 	}
+
+		// Initialize detector repository if database is available
+		if database.DB != nil {
+			handler.dbContext = &DBContext{
+				profiles:       database.NewProfileRepository(database.DB),
+				detectors:      database.NewDetectorRepository(database.DB),
+				globalSettings: database.NewGlobalSettingsRepository(database.DB),
+			}
+
+			handler.slurper = slurp.New(handler.dbContext)
+		}
 
 	// API routes
 	api := r.Group("/api")
@@ -24,8 +34,6 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 		// Authentication & Configuration
 		api.POST("/auth/test", handler.TestAuth)
 		api.POST("/auth/setup", handler.SetupAuth)
-		api.GET("/config", handler.GetConfig)
-		api.PUT("/config", handler.UpdateConfig)
 
 		// Core Operations
 		api.GET("/whoami", handler.WhoAmI)
@@ -47,10 +55,22 @@ func SetupRoutes(r *gin.Engine, slurper slurp.Slurper, config *slurp.Config, hub
 
 		// Detector Management
 		api.GET("/secrets/detectors", handler.GetBuiltInDetectors)
-		// api.GET("/secrets/custom-detectors", handler.GetCustomDetectors)
-		// api.POST("/secrets/custom-detectors", handler.CreateCustomDetector)
-		// api.PUT("/secrets/custom-detectors/:name", handler.UpdateCustomDetector)
-		// api.DELETE("/secrets/custom-detectors/:name", handler.DeleteCustomDetector)
+		api.GET("/secrets/custom-detectors", handler.GetCustomDetectors)
+		api.POST("/secrets/custom-detectors", handler.CreateCustomDetector)
+		api.PUT("/secrets/custom-detectors/:id", handler.UpdateCustomDetector)
+		api.DELETE("/secrets/custom-detectors/:id", handler.DeleteCustomDetector)
+
+		// Profile Management
+		api.GET("/profiles", handler.GetProfiles)
+		api.GET("/profiles/count", handler.GetProfilesCount)
+		api.POST("/profiles", handler.CreateProfile)
+		api.PUT("/profiles/:id", handler.UpdateProfile)
+		api.DELETE("/profiles/:id", handler.DeleteProfile)
+		api.POST("/profiles/:id/select", handler.SelectProfile)
+
+		// Global Settings
+		api.GET("/settings/global", handler.GetGlobalSettings)
+		api.PUT("/settings/global", handler.UpdateGlobalSettings)
 
 		api.GET("/download/:id", handler.DownloadFile)
 	}

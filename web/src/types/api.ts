@@ -1,16 +1,16 @@
 export interface Credentials {
-  api_token: string
-  d_cookie: string
-  ds_cookie: string
+  apiToken: string
+  dCookie: string
+  dsCookie: string
 }
 
 export interface AuthTestResult {
   url: string
   team: string
   user: string
-  team_id: string
-  user_id: string
-  bot_id?: string
+  teamId: string
+  userId: string
+  botId?: string
 }
 
 export interface Team {
@@ -23,31 +23,31 @@ export type ChannelType = 'all' | 'public' | 'private' | 'direct' | 'group'
 export interface Channel {
   id: string
   name: string
-  is_channel: boolean
-  is_im: boolean
-  is_mpim: boolean
-  is_private: boolean
-  is_archived: boolean
-  is_general: boolean
-  is_external: boolean
+  isChannel: boolean
+  isIm: boolean
+  isMpim: boolean
+  isPrivate: boolean
+  isArchived: boolean
+  isGeneral: boolean
+  isExternal: boolean
   latest: number
   created: number
-  num_members: number
-  shared_teams: Team[]
+  numMembers: number
+  sharedTeams: Team[]
   topic?: string
 }
 
 export interface User {
   name: string
-  real_name: string
+  realName: string
   email: string
   username: string
   image: string
   phone: string
   title: string
-  is_admin: boolean
-  is_owner: boolean
-  is_bot: boolean
+  isAdmin: boolean
+  isOwner: boolean
+  isBot: boolean
   deleted: boolean
 }
 
@@ -69,8 +69,8 @@ export interface SearchRequest {
   users?: string[]
   before?: string
   after?: string
-  file_types?: string[]
-  search_type?: 'messages' | 'files' | 'both'
+  fileTypes?: string[]
+  searchType?: 'messages' | 'files' | 'both'
 }
 
 export interface SecretScanRequest {
@@ -80,11 +80,11 @@ export interface SecretScanRequest {
   after?: string
   detectors: string[]
   verify: boolean
-  verified_only: boolean
+  verifiedOnly: boolean
 }
 
 export interface SecretScanResult {
-  scan_id: string
+  scanId: string
   status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
 }
 
@@ -102,7 +102,7 @@ export interface SecretResult {
   user: string
   timestamp: string
   verified: boolean
-  false_positive: boolean
+  falsePositive: boolean
 }
 
 export interface CustomDetector {
@@ -111,15 +111,15 @@ export interface CustomDetector {
   keywords: string[]
   patterns: string[]
   description: string
-  created_at: string
-  updated_at: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface DetectorInfo {
   id: string
   name: string
   description: string
-  is_custom: boolean
+  isCustom: boolean
 }
 
 export interface DomainSearchRequest {
@@ -135,10 +135,10 @@ export interface DomainResult {
 }
 
 export interface DomainSearchResponse {
-  search_id: string
+  searchId: string
   status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
-  total_found?: number
-  domains_searched?: string[]
+  totalFound?: number
+  domainsSearched?: string[]
 }
 
 export interface URLSearchRequest {
@@ -149,13 +149,13 @@ export interface URLSearchRequest {
 }
 
 export interface URLSearchResponse {
-  search_id: string
+  searchId: string
   status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled'
-  total_found?: number
+  totalFound?: number
 }
 
 export interface SearchResponse {
-  search_id: string
+  searchId: string
   status: 'started' | 'completed' | 'failed' | 'cancelled'
   query: string
 }
@@ -180,6 +180,6 @@ export interface FileResult {
 
 export interface WSMessage {
   id: string
-  type: 'error' | 'complete' | 'connected' | 'domain_result' | 'url_result' | 'message_result' | 'file_result'
+  type: 'error' | 'complete' | 'connected' | 'domainResult' | 'urlResult' | 'messageResult' | 'fileResult'
   data: any
 }

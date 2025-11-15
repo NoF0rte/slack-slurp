@@ -97,7 +97,7 @@ export function SecretResultCard({ result, onToggleFalsePositive }: SecretResult
                   UNVERIFIED
                 </span>
               )}
-              {result.false_positive && (
+              {result.falsePositive && (
                 <span className="text-xs px-2 py-1 rounded bg-red-900/20 text-red-400">
                   FALSE POSITIVE
                 </span>
@@ -108,13 +108,13 @@ export function SecretResultCard({ result, onToggleFalsePositive }: SecretResult
         <button
           onClick={() => onToggleFalsePositive()}
           className={`flex items-center space-x-1 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-            result.false_positive
+            result.falsePositive
               ? 'bg-green-600 text-white hover:bg-green-700'
               : 'bg-red-600 text-white hover:bg-red-700'
           }`}
-          title={result.false_positive ? 'Mark as valid' : 'Mark as false positive'}
+          title={result.falsePositive ? 'Mark as valid' : 'Mark as false positive'}
         >
-          {result.false_positive ? (
+          {result.falsePositive ? (
             <>
               <CheckIcon className="w-3 h-3" />
               <span>Valid</span>

@@ -5,6 +5,7 @@ import { DomainsPage } from './domains/DomainsPage'
 import { URLsPage } from './urls/URLsPage'
 import { SearchPage } from './search/SearchPage'
 import { SecretsPage } from './secrets/SecretsPage'
+import { SettingsPage } from './settings/SettingsPage'
 
 type Route = 'dashboard' | 'channels' | 'users' | 'domains' | 'urls' | 'search' | 'secrets' | 'settings'
 
@@ -42,13 +43,13 @@ export function Router() {
       case 'secrets':
         return <SecretsPage />
       case 'settings':
-        return <div className="p-6"><h1 className="text-2xl font-bold text-white">Settings</h1><p className="text-gray-400">Settings page coming soon...</p></div>
+        return <SettingsPage />
       case 'dashboard':
       default:
         return (
           <div className="p-6">
             <h1 className="text-2xl font-bold text-white mb-6">
-              🚀 Slack-Slurp Dashboard
+              Slack-Slurp Dashboard
             </h1>
             <p className="text-gray-400 mb-6">
               Welcome to the Slack reconnaissance and secret detection dashboard.

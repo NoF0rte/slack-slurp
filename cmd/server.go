@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 
 	"github.com/NoF0rte/slack-slurp/internal/api"
+	"github.com/NoF0rte/slack-slurp/internal/database"
 	"github.com/NoF0rte/slack-slurp/internal/static"
 	"github.com/NoF0rte/slack-slurp/internal/websocket"
 	"github.com/gin-gonic/gin"
@@ -24,6 +26,13 @@ This provides a web interface for all slack-slurp functionality.`,
 		// Set Gin mode
 		// gin.SetMode(gin.ReleaseMode)
 
+		// Initialize database
+		log.Println("Initializing database...")
+		if err := database.InitDB(); err != nil {
+			return fmt.Errorf("failed to initialize database: %w", err)
+		}
+		log.Println("Database initialized successfully")
+
 		// Create WebSocket hub
 		hub := websocket.NewHub()
 		go hub.Run()
@@ -32,7 +41,7 @@ This provides a web interface for all slack-slurp functionality.`,
 		router := gin.Default()
 
 		// Setup API routes
-		api.SetupRoutes(router, slurper, &config, hub)
+		api.SetupRoutes(router, hub)
 
 		// Serve static files from embedded FS
 		router.StaticFileFS("/", "/", http.FS(static.FS)) // Must be / that we query from the embedded FS, otherwise Gin will go into a redirect loop

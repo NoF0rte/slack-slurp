@@ -62,7 +62,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       const handleDomainResult = (id: string, data: DomainResult) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id) {
+        if (!currentSearch || currentSearch.searchId != id) {
           return
         }
 
@@ -74,7 +74,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       const handleComplete = (id: string) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id) {
+        if (!currentSearch || currentSearch.searchId != id) {
           return
         }
         
@@ -82,15 +82,15 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
           isSearching: false,
           isLoading: false,
           currentSearch: currentSearch ? {
-            search_id: currentSearch.search_id,
+            searchId: currentSearch.searchId,
             status: 'completed' as const,
-            total_found: state.results.length,
-            domains_searched: currentSearch.domains_searched
+            totalFound: state.results.length,
+            domainsSearched: currentSearch.domainsSearched
           } : null
         })
         
         // Clean up listeners
-        wsManager.off('domain_result', handleDomainResult)
+        wsManager.off('domainResult', handleDomainResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
@@ -98,7 +98,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
       const handleError = (id: string, data: any) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id) {
+        if (!currentSearch || currentSearch.searchId != id) {
           return
         }
 
@@ -109,13 +109,13 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('domain_result', handleDomainResult)
+        wsManager.off('domainResult', handleDomainResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
       
       // Add listeners
-      wsManager.on('domain_result', handleDomainResult)
+      wsManager.on('domainResult', handleDomainResult)
       wsManager.on('complete', handleComplete)
       wsManager.on('error', handleError)
       
@@ -148,7 +148,7 @@ export const useDomainsStore = create<DomainsState>((set, get) => ({
     const currentSearch = get().currentSearch
     if (currentSearch) {
       // Send stop request to backend
-      api.post(`/search/stop/${currentSearch.search_id}`).catch(console.error)
+      api.post(`/search/stop/${currentSearch.searchId}`).catch(console.error)
     }
     
     set({

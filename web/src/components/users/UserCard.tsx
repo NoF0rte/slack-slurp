@@ -15,7 +15,7 @@ interface UserCardProps {
 
 export function UserCard({ user }: UserCardProps) {
   const getDisplayName = () => {
-    return user.real_name || user.name || 'Unknown User'
+    return user.realName || user.name || 'Unknown User'
   }
   
   const getProfilePicture = () => {
@@ -45,17 +45,17 @@ export function UserCard({ user }: UserCardProps) {
   
   const getUserStatus = () => {
     if (user.deleted) return { text: 'Deleted', color: 'bg-red-900 text-red-200' }
-    if (user.is_bot) return { text: 'Bot', color: 'bg-blue-900 text-blue-200' }
-    if (user.is_admin) return { text: 'Admin', color: 'bg-purple-900 text-purple-200' }
-    if (user.is_owner) return { text: 'Owner', color: 'bg-yellow-900 text-yellow-200' }
+    if (user.isBot) return { text: 'Bot', color: 'bg-blue-900 text-blue-200' }
+    if (user.isAdmin) return { text: 'Admin', color: 'bg-purple-900 text-purple-200' }
+    if (user.isOwner) return { text: 'Owner', color: 'bg-yellow-900 text-yellow-200' }
     // if (user.is_primary_owner) return { text: 'Primary Owner', color: 'bg-orange-100 text-orange-800' }
     return { text: 'Member', color: 'bg-green-900 text-green-200' }
   }
   
   const getStatusIcon = () => {
     if (user.deleted) return <ExclamationTriangleIcon className="w-4 h-4" />
-    if (user.is_bot) return <ShieldCheckIcon className="w-4 h-4" />
-    if (user.is_owner) return <StarIcon className="w-4 h-4" />
+    if (user.isBot) return <ShieldCheckIcon className="w-4 h-4" />
+    if (user.isOwner) return <StarIcon className="w-4 h-4" />
     return null
   }
   

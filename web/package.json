@@ -5,11 +5,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "vite",
     "clean": "rm -f ../internal/static/index.html && rm -rf ../internal/static/assets",
-    "build": "npm run clean && tsc && vite build",
-    "preview": "vite preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run clean && tsc && vite build"
   },
   "keywords": [],
   "author": "",

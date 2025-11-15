@@ -52,7 +52,7 @@ export function MultiSelectDropdown({
   const filteredOptions = options.filter(option => {
     const query = searchQuery.toLowerCase()
     return (
-      option.label.toLowerCase().includes(query) ||
+      option.label?.toLowerCase().includes(query) ||
       (option.subtitle && option.subtitle.toLowerCase().includes(query))
     )
   })

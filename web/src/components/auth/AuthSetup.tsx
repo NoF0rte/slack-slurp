@@ -4,10 +4,11 @@ import { Credentials } from '../../types/api'
 
 export function AuthSetup() {
   const [credentials, setCredentials] = useState<Credentials>({
-    api_token: '',
-    d_cookie: '',
-    ds_cookie: ''
+    apiToken: '',
+    dCookie: '',
+    dsCookie: ''
   })
+  const [profileName, setProfileName] = useState('')
   
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,14 +36,23 @@ export function AuthSetup() {
   }
   
   const handleSetup = async () => {
+    if (!profileName.trim()) {
+      setError('Profile name is required')
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     setSuccess(null)
     
     try {
-      const result = await setupAuth(credentials)
+      const result = await setupAuth(credentials, profileName)
       if (result.success) {
         setSuccess('Authentication setup completed successfully!')
+        // Reload page to show main app
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
       } else {
         setError(result.error || 'Setup failed')
       }
@@ -63,14 +73,30 @@ export function AuthSetup() {
       <form className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
+            Profile Name *
+          </label>
+          <input
+            type="text"
+            value={profileName}
+            onChange={(e) => setProfileName(e.target.value)}
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
+            placeholder="My Workspace"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Give this profile a name to identify it
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
             API Token
           </label>
           <input
             type="password"
-            value={credentials.api_token}
+            value={credentials.apiToken}
             onChange={(e) => setCredentials({
               ...credentials,
-              api_token: e.target.value
+              apiToken: e.target.value
             })}
             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
             placeholder="xoxb-your-token-here or xoxc-your-token-here"
@@ -86,10 +112,10 @@ export function AuthSetup() {
           </label>
           <input
             type="password"
-            value={credentials.d_cookie}
+            value={credentials.dCookie}
             onChange={(e) => setCredentials({
               ...credentials,
-              d_cookie: e.target.value
+              dCookie: e.target.value
             })}
             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
             placeholder="xoxd-your-cookie-here"
@@ -105,10 +131,10 @@ export function AuthSetup() {
           </label>
           <input
             type="password"
-            value={credentials.ds_cookie}
+            value={credentials.dsCookie}
             onChange={(e) => setCredentials({
               ...credentials,
-              ds_cookie: e.target.value
+              dsCookie: e.target.value
             })}
             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
             placeholder="d-s-cookie-value"
@@ -122,7 +148,7 @@ export function AuthSetup() {
           <button
             type="button"
             onClick={handleTest}
-            disabled={isLoading || !credentials.api_token.trim()}
+            disabled={isLoading || !credentials.apiToken.trim()}
             className="w-full px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {isLoading ? 'Testing...' : 'Test Credentials'}
@@ -131,7 +157,7 @@ export function AuthSetup() {
           <button
             type="button"
             onClick={handleSetup}
-            disabled={isLoading || !credentials.api_token.trim()}
+            disabled={isLoading || !credentials.apiToken.trim() || !profileName.trim()}
             className="w-full px-4 py-2 bg-slack-purple text-white rounded-md font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {isLoading ? 'Setting up...' : 'Setup Authentication'}

@@ -61,15 +61,15 @@ export function ChannelsPage() {
       return b.latest - a.latest
     }
     // Then by number of members (most members first)
-    return b.num_members - a.num_members
+    return b.numMembers - a.numMembers
   }
 
   const groupedChannels = {
-    public: filteredChannels.filter(ch => !ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im).sort(sortChannels),
-    private: filteredChannels.filter(ch => ch.is_private && !ch.is_archived && !ch.is_mpim && !ch.is_im).sort(sortChannels),
-    direct: filteredChannels.filter(ch => ch.is_im).sort(sortChannels),
-    group: filteredChannels.filter(ch => ch.is_mpim).sort(sortChannels),
-    archived: filteredChannels.filter(ch => ch.is_archived).sort(sortChannels),
+    public: filteredChannels.filter(ch => !ch.isPrivate && !ch.isArchived && !ch.isMpim && !ch.isIm).sort(sortChannels),
+    private: filteredChannels.filter(ch => ch.isPrivate && !ch.isArchived && !ch.isMpim && !ch.isIm).sort(sortChannels),
+    direct: filteredChannels.filter(ch => ch.isIm).sort(sortChannels),
+    group: filteredChannels.filter(ch => ch.isMpim).sort(sortChannels),
+    archived: filteredChannels.filter(ch => ch.isArchived).sort(sortChannels),
   }
 
   const getGroupTitle = (group: keyof typeof groupedChannels) => {

@@ -55,13 +55,13 @@ export function SearchPage() {
     }
 
     const request = {
-      search_type: searchType,
+      searchType: searchType,
       query: searchQuery,
       channels: selectedChannels,
       users: selectedUsers,
       before: beforeDate,
       after: afterDate,
-      file_types: fileTypes ? fileTypes.split(',').map(type => type.trim()).filter(type => type.length > 0) : undefined
+      fileTypes: fileTypes ? fileTypes.split(',').map(type => type.trim()).filter(type => type.length > 0) : undefined
     }
 
     try {

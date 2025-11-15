@@ -68,7 +68,7 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('channel_result', handleChannelResult)
+        wsManager.off('channelResult', handleChannelResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
@@ -85,13 +85,13 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
         })
         
         // Clean up listeners
-        wsManager.off('channel_result', handleChannelResult)
+        wsManager.off('channelResult', handleChannelResult)
         wsManager.off('complete', handleComplete)
         wsManager.off('error', handleError)
       }
       
       // Add listeners
-      wsManager.on('channel_result', handleChannelResult)
+      wsManager.on('channelResult', handleChannelResult)
       wsManager.on('complete', handleComplete)
       wsManager.on('error', handleError)
       

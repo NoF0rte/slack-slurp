@@ -83,7 +83,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const handleMessageResult = (id: string, data: MessageResult) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id || state.isStopped) {
+        if (!currentSearch || currentSearch.searchId != id || state.isStopped) {
           return
         }
 
@@ -95,7 +95,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const handleFileResult = (id: string, data: FileResult) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id || state.isStopped) {
+        if (!currentSearch || currentSearch.searchId != id || state.isStopped) {
           return
         }
         
@@ -107,7 +107,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const handleComplete = (id: string) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id || state.isStopped) {
+        if (!currentSearch || currentSearch.searchId != id || state.isStopped) {
           return
         }
         
@@ -127,7 +127,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const handleError = (id: string, data: any) => {
         const state = get()
         const currentSearch = state.currentSearch
-        if (!currentSearch || currentSearch.search_id != id || state.isStopped) {
+        if (!currentSearch || currentSearch.searchId != id || state.isStopped) {
           return
         }
 
@@ -149,8 +149,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         errorHandler: handleError
       })
       
-      wsManager.on('message_result', handleMessageResult)
-      wsManager.on('file_result', handleFileResult)
+      wsManager.on('messageResult', handleMessageResult)
+      wsManager.on('fileResult', handleFileResult)
       wsManager.on('complete', handleComplete)
       wsManager.on('error', handleError)
       
@@ -160,7 +160,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       
       set({
         currentSearch: searchResponse,
-        searchType: request.search_type
+        searchType: request.searchType
       })
       
     } catch (error: any) {
@@ -185,7 +185,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const currentSearch = state.currentSearch
     if (currentSearch) {
       // Send stop request to backend
-      api.post(`/search/stop/${currentSearch.search_id}`).catch(console.error)
+      api.post(`/search/stop/${currentSearch.searchId}`).catch(console.error)
     }
     
     // Set stopped flag to prevent processing any queued messages
@@ -203,8 +203,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const state = get()
 
     // Clean up all WebSocket listeners to stop processing messages
-    if (state.messageHandler) wsManager.off('message_result', state.messageHandler)
-    if (state.fileHandler) wsManager.off('file_result', state.fileHandler)
+    if (state.messageHandler) wsManager.off('messageResult', state.messageHandler)
+    if (state.fileHandler) wsManager.off('fileResult', state.fileHandler)
     if (state.completeHandler) wsManager.off('complete', state.completeHandler)
     if (state.errorHandler) wsManager.off('error', state.errorHandler)
     

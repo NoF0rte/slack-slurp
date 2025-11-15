@@ -42,19 +42,19 @@ export function SearchOptions({
 
   // Prepare options for dropdowns
   const channelOptions = channels
-    .filter(channel => !channel.is_im && !channel.is_mpim)
-    .sort((a, b) => b.num_members - a.num_members)
+    .filter(channel => !channel.isIm && !channel.isMpim)
+    .sort((a, b) => b.numMembers - a.numMembers)
     .map(channel => ({
       id: channel.name,
       label: channel.name,
-      subtitle: `${channel.num_members} members`
+      subtitle: `${channel.numMembers} members`
     }))
 
   const userOptions = users
-    .filter(user => !user.is_bot && user.real_name != "Deactivated User")
+    .filter(user => !user.isBot && user.realName != "Deactivated User")
     .map(user => ({
       id: user.name,
-      label: user.real_name,
+      label: user.realName,
       subtitle: `@${user.name}`
     }))
 
