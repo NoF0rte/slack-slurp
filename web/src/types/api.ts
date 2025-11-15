@@ -120,6 +120,7 @@ export interface DetectorInfo {
   name: string
   description: string
   isCustom: boolean
+  keywords?: string[]
 }
 
 export interface DomainSearchRequest {

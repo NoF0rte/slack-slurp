@@ -82,9 +82,10 @@ type SecretScanRequest struct {
 }
 
 type DetectorInfo struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	IsCustom    bool   `json:"isCustom"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	IsCustom    bool     `json:"isCustom"`
+	Keywords    []string `json:"keywords,omitempty"`
 }
 
 type CustomDetector struct {
@@ -624,10 +625,17 @@ func (h *APIHandler) DownloadFile(c *gin.Context) {
 func (h *APIHandler) GetBuiltInDetectors(c *gin.Context) {
 	var detectorInfos []DetectorInfo
 	for name, detector := range slurp.BuiltInDetectors {
+		keywords := []string{}
+		// Try to get keywords from detector if it implements Keywords() method
+		if keywordDetector, ok := detector.(interface{ Keywords() []string }); ok {
+			keywords = keywordDetector.Keywords()
+		}
+		
 		detectorInfos = append(detectorInfos, DetectorInfo{
 			Name:        name,
 			Description: detector.Description(),
 			IsCustom:    false,
+			Keywords:    keywords,
 		})
 	}
 

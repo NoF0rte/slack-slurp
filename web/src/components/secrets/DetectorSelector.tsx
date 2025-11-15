@@ -131,6 +131,7 @@ interface TooltipDetectorProps {
 function TooltipDetector({ detector, isSelected, onToggle, color, isCustom = false }: TooltipDetectorProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom' | 'left' | 'right'>('top')
+  const [arrowOffset, setArrowOffset] = useState(0)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
 
@@ -142,61 +143,105 @@ function TooltipDetector({ detector, isSelected, onToggle, color, isCustom = fal
 
       const buttonRect = buttonRef.current.getBoundingClientRect()
       const tooltipRect = tooltipRef.current.getBoundingClientRect()
-      const viewportWidth = window.innerWidth
+      
+      // Get viewport dimensions - clientWidth excludes scrollbar, innerWidth includes it
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth
       const viewportHeight = window.innerHeight
       const sidebarWidth = 256 // Approximate sidebar width
       const padding = 20
-
+      
       // Get actual tooltip dimensions
       const tooltipWidth = tooltipRect.width || 320
       const tooltipHeight = tooltipRect.height || 150
 
+      // Available width is viewport width minus padding
+      const availableWidth = viewportWidth - padding * 2
+
       // Check if tooltip would overflow on the right
-      const rightOverflow = buttonRect.left + tooltipWidth / 2 > viewportWidth - padding
-      // Check if tooltip would overflow on the left (considering sidebar)
-      const leftOverflow = buttonRect.left - tooltipWidth / 2 < sidebarWidth + padding
+      const tooltipRightEdge = buttonRect.left + buttonRect.width / 2 + tooltipWidth / 2
+      
       // Check if tooltip would overflow on top
       const topOverflow = buttonRect.top - tooltipHeight < padding
       // Check if tooltip would overflow on bottom
       const bottomOverflow = buttonRect.bottom + tooltipHeight > viewportHeight - padding
 
-      // Determine vertical position
-      const verticalPos = topOverflow && !bottomOverflow ? 'bottom' : 'top'
-      setTooltipPosition(verticalPos)
-
-      // Calculate horizontal position - center on button
-      let left = buttonRect.left + buttonRect.width / 2
+      // Calculate button center position
+      const buttonCenterX = buttonRect.left + buttonRect.width / 2
+      const buttonCenterY = buttonRect.top + buttonRect.height / 2
       
-      // If tooltip would be covered by sidebar, allow it to show over the sidebar
-      // but still center on the button
-      if (leftOverflow) {
-        // Allow tooltip to extend into sidebar area, but ensure it's still centered on button
-        // Only adjust if it would be completely hidden
-        const tooltipLeftEdge = left - tooltipWidth / 2
-        if (tooltipLeftEdge < 0) {
-          // Tooltip would start before viewport, adjust to show over sidebar
-          left = Math.max(left, tooltipWidth / 2 + padding)
-        }
-      }
+      // Determine initial position preference
+      let preferredVerticalPos: 'top' | 'bottom' = topOverflow && !bottomOverflow ? 'bottom' : 'top'
       
-      // Adjust if would overflow right edge
-      if (rightOverflow) {
-        const tooltipRightEdge = left + tooltipWidth / 2
-        if (tooltipRightEdge > viewportWidth - padding) {
-          left = viewportWidth - padding - tooltipWidth / 2
-        }
-      }
-
-      // Apply position
-      const top = verticalPos === 'top' 
+      // Check if we can position above/below with arrow centered
+      let left = buttonCenterX
+      let top = preferredVerticalPos === 'top' 
         ? buttonRect.top - 10
         : buttonRect.bottom + 10
       
+      let arrowOffsetX = 0
+      let finalPosition: 'top' | 'bottom' | 'left' | 'right' = preferredVerticalPos
+      
+      const wouldOverflowRight = tooltipRightEdge > availableWidth
+      
+      // If tooltip would be shifted horizontally and arrow wouldn't point at button, use side positioning
+      if (wouldOverflowRight) {
+        let shiftNeeded = (availableWidth - tooltipWidth / 2) - buttonCenterX
+        
+        // If arrow would be more than 30% off center, use side positioning instead
+        const maxArrowOffset = tooltipWidth * 0.3
+        if (Math.abs(shiftNeeded) > maxArrowOffset) {
+          // Use side positioning
+          const spaceOnLeft = buttonRect.left - sidebarWidth - padding
+          const spaceOnRight = availableWidth - buttonRect.right
+          
+          if (spaceOnRight >= tooltipWidth + 10) {
+            // Position to the right
+            finalPosition = 'right'
+            left = buttonRect.right + 10
+            top = buttonCenterY
+            arrowOffsetX = 0
+          } else if (spaceOnLeft >= tooltipWidth + 10) {
+            // Position to the left
+            finalPosition = 'left'
+            left = buttonRect.left - tooltipWidth - 10
+            top = buttonCenterY
+            arrowOffsetX = 0
+          } else {
+            // Not enough space on either side, use top/bottom with adjusted arrow
+            finalPosition = preferredVerticalPos
+            left = buttonCenterX + shiftNeeded
+            arrowOffsetX = -shiftNeeded
+          }
+        } else {
+          // Small shift, keep top/bottom but adjust arrow
+          left = buttonCenterX + shiftNeeded
+          arrowOffsetX = -shiftNeeded
+          finalPosition = preferredVerticalPos
+        }
+      } else {
+        // No overflow, center perfectly
+        left = buttonCenterX
+        arrowOffsetX = 0
+        finalPosition = preferredVerticalPos
+      }
+      
+      setTooltipPosition(finalPosition)
+      setArrowOffset(arrowOffsetX)
+      
+      // Apply position
       tooltipRef.current.style.left = `${left}px`
       tooltipRef.current.style.top = `${top}px`
-      tooltipRef.current.style.transform = verticalPos === 'top' 
-        ? 'translate(-50%, -100%)' 
-        : 'translate(-50%, 0)'
+      
+      // Set transform based on position
+      if (finalPosition === 'top') {
+        tooltipRef.current.style.transform = `translate(-50%, -100%)`
+      } else if (finalPosition === 'bottom') {
+        tooltipRef.current.style.transform = `translate(-50%, 0)`
+      } else if (finalPosition === 'left') {
+        tooltipRef.current.style.transform = `translate(0, -50%)`
+      } else if (finalPosition === 'right') {
+        tooltipRef.current.style.transform = `translate(0, -50%)`
+      }
     }
 
     // Small delay to ensure tooltip is rendered and we can measure it
@@ -244,25 +289,59 @@ function TooltipDetector({ detector, isSelected, onToggle, color, isCustom = fal
         <div
           ref={tooltipRef}
           className="fixed px-4 py-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg z-[9999] w-80 max-w-[calc(100vw-2rem)] pointer-events-none"
-          style={{
-            transform: tooltipPosition === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-          }}
         >
           <div className="text-center">
             <div className={`font-medium ${classes.tooltipTitle} mb-2`}>{detector.name}</div>
             <div className="text-gray-300 mb-3 leading-relaxed">{detector.description}</div>
-            {isCustom && 'keywords' in detector && (
-              <div className="text-gray-400 text-xs">
+            {detector.keywords && detector.keywords.length > 0 && (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-gray-400 mb-2">Keywords:</div>
+                <div className="flex flex-wrap gap-1 justify-center">
+                  {detector.keywords.slice(0, 10).map((keyword, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                  {detector.keywords.length > 10 && (
+                    <span className="px-2 py-1 text-gray-500 text-xs">
+                      +{detector.keywords.length - 10} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            {isCustom && 'keywords' in detector && 'patterns' in detector && (
+              <div className="text-gray-400 text-xs mt-2">
                 {detector.keywords.length} keywords, {detector.patterns.length} patterns
               </div>
             )}
           </div>
           {/* Arrow */}
-          <div className={`absolute ${
-            tooltipPosition === 'top' ? 'top-full' : 'bottom-full'
-          } left-1/2 transform -translate-x-1/2 border-4 border-transparent ${
-            tooltipPosition === 'top' ? 'border-t-gray-900' : 'border-b-gray-900'
-          }`}></div>
+          <div 
+            className={`absolute border-4 border-transparent ${
+              tooltipPosition === 'top' 
+                ? 'top-full border-t-gray-900' 
+                : tooltipPosition === 'bottom'
+                ? 'bottom-full border-b-gray-900'
+                : tooltipPosition === 'left'
+                ? 'left-full border-l-gray-900'
+                : 'right-full border-r-gray-900'
+            }`}
+            style={
+              tooltipPosition === 'top' || tooltipPosition === 'bottom'
+                ? {
+                    left: `calc(50% + ${arrowOffset}px)`,
+                    transform: 'translateX(-50%)',
+                  }
+                : {
+                    top: `calc(50% + ${arrowOffset}px)`,
+                    transform: 'translateY(-50%)',
+                  }
+            }
+          ></div>
         </div>
       )}
     </div>

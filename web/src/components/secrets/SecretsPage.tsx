@@ -282,7 +282,7 @@ export function SecretsPage() {
         </div>
         
         {/* Action Buttons */}
-        <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-700">
+        <div className="flex items-center justify-start space-x-3 mt-6 pt-4 border-t border-gray-700">
           <button
             onClick={handleScan}
             disabled={isLoading || isScanning || selectedDetectors.length === 0}

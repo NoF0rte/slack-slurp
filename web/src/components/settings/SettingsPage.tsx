@@ -327,11 +327,9 @@ export function SettingsPage() {
           {/* Profile Management Section */}
           {activeTab === 'profiles' && (
             <div>
+              <p className="text-base text-gray-300 mb-6">Manage Slack authentication profiles to switch between different workspaces and accounts.</p>
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">Profiles</h2>
-                  <p className="text-sm text-gray-400">Manage Slack authentication profiles</p>
-                </div>
+                <div></div>
                 <button
                   onClick={() => {
                     setProfileFormData({ name: '', apiToken: '', dCookie: '', dsCookie: '' })
@@ -410,11 +408,9 @@ export function SettingsPage() {
           {/* Custom Detectors Section */}
           {activeTab === 'detectors' && (
             <div>
+              <p className="text-base text-gray-300 mb-6">Create and manage custom secret detection patterns with keywords and regex patterns to scan for specific types of sensitive data.</p>
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">Custom Detectors</h2>
-                  <p className="text-sm text-gray-400">Manage custom secret detection patterns</p>
-                </div>
+                <div></div>
                 <button
                   onClick={handleOpenCreate}
                   className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 cursor-pointer"
@@ -525,10 +521,7 @@ export function SettingsPage() {
           {/* Global Search Options Section */}
           {activeTab === 'global' && (
             <div>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-white">Global Search Options</h2>
-                <p className="text-sm text-gray-400">Configure global settings for search operations</p>
-              </div>
+              <p className="text-base text-gray-300 mb-6">Configure global settings that affect all search operations across the application.</p>
 
               {settingsError && (
                 <div className="mb-4 bg-red-900 border border-red-700 rounded p-3">
