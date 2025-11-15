@@ -17,16 +17,25 @@ func SetupRoutes(r *gin.Engine, hub *websocket.Hub) {
 		searchMap: make(map[string]context.CancelFunc),
 	}
 
-		// Initialize detector repository if database is available
-		if database.DB != nil {
-			handler.dbContext = &DBContext{
-				profiles:       database.NewProfileRepository(database.DB),
-				detectors:      database.NewDetectorRepository(database.DB),
-				globalSettings: database.NewGlobalSettingsRepository(database.DB),
-			}
-
-			handler.slurper = slurp.New(handler.dbContext)
+	// Initialize detector repository if database is available
+	if database.DB != nil {
+		handler.dbContext = &DBContext{
+			profiles:       database.NewProfileRepository(database.DB),
+			detectors:      database.NewDetectorRepository(database.DB),
+			globalSettings: database.NewGlobalSettingsRepository(database.DB),
 		}
+
+		handler.slurper = slurp.New(handler.dbContext)
+
+		selectedProfile, _ := handler.dbContext.profiles.GetSelected()
+		if selectedProfile != nil {
+			_, err := handler.slurper.AuthTest()
+			if err != nil { // we got bad creds
+				selectedProfile.IsSelected = false
+				handler.dbContext.profiles.Update(selectedProfile)
+			}
+		}
+	}
 
 	// API routes
 	api := r.Group("/api")

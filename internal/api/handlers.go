@@ -225,13 +225,19 @@ func (h *APIHandler) SetupAuth(c *gin.Context) {
 				return
 			}
 
+			selected, err := h.dbContext.profiles.GetSelected()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get selected profile: " + err.Error()})
+				return
+			}
+
 			// Create new profile
 			profile = &database.Profile{
 				Name:       req.Name,
 				APIToken:   req.APIToken,
 				DCookie:    req.DCookie,
 				DSCookie:   req.DSCookie,
-				IsSelected: count == 0, // First profile is automatically selected
+				IsSelected: count == 0 || selected == nil, // First profile is automatically selected or if no profiles are selected
 			}
 
 			if err := h.dbContext.profiles.Create(profile); err != nil {
@@ -630,7 +636,7 @@ func (h *APIHandler) GetBuiltInDetectors(c *gin.Context) {
 		if keywordDetector, ok := detector.(interface{ Keywords() []string }); ok {
 			keywords = keywordDetector.Keywords()
 		}
-		
+
 		detectorInfos = append(detectorInfos, DetectorInfo{
 			Name:        name,
 			Description: detector.Description(),

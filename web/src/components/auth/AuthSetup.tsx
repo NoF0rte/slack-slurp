@@ -14,26 +14,7 @@ export function AuthSetup() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
-  const { testAuth, setupAuth } = useAuthStore()
-  
-  const handleTest = async () => {
-    setIsLoading(true)
-    setError(null)
-    setSuccess(null)
-    
-    try {
-      const result = await testAuth()
-      if (result.success) {
-        setSuccess('Credentials are valid! You can now use the dashboard.')
-      } else {
-        setError(result.error || 'Authentication failed')
-      }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { setupAuth } = useAuthStore()
   
   const handleSetup = async () => {
     if (!profileName.trim()) {
@@ -145,15 +126,6 @@ export function AuthSetup() {
         </div>
         
         <div className="space-y-3">
-          <button
-            type="button"
-            onClick={handleTest}
-            disabled={isLoading || !credentials.apiToken.trim()}
-            className="w-full px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            {isLoading ? 'Testing...' : 'Test Credentials'}
-          </button>
-          
           <button
             type="button"
             onClick={handleSetup}
