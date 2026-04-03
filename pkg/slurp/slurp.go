@@ -1045,7 +1045,7 @@ func (s Slurper) GetURLsAsyncWithContext(ctx context.Context, options ...SearchO
 	urlChan := make(chan string)
 	errorChan := make(chan error)
 
-	keywords := []string{"http://", "https://"}
+	keywords := []string{`"http://"`, `"https://"`}
 	go func() {
 		defer close(urlChan)
 
