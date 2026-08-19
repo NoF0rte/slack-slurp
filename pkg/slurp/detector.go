@@ -11,10 +11,10 @@ import (
 const detectorType_Custom detectorspb.DetectorType = 5000
 
 type CustomDetector struct {
-	Name      string   `mapstructure:"name"`
-	Keywordss []string `mapstructure:"keywords"`
-	Patterns  []string `mapstructure:"patterns"`
-	Desc      string   `mapstructure:"description"`
+	Name      string   `mapstructure:"name" json:"name"`
+	Keywordss []string `mapstructure:"keywords" json:"keywords"`
+	Patterns  []string `mapstructure:"patterns" json:"patterns"`
+	Desc      string   `mapstructure:"description" json:"description"`
 }
 
 func (d *CustomDetector) Keywords() []string {

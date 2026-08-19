@@ -52,139 +52,115 @@ import (
 	"github.com/trufflesecurity/trufflehog/v3/pkg/detectors/uri"
 )
 
+var (
+	BuiltInDetectors map[string]detectors.Detector = map[string]detectors.Detector{
+		"anthropic":                        anthropic.Scanner{},
+		"atlassianv1":                      atlassianv1.Scanner{},
+		"atlassianv2":                      atlassianv2.Scanner{},
+		"bitbucketapppassword":             bitbucketapppassword.Scanner{},
+		"box":                              box.Scanner{},
+		"boxoauth":                         boxoauth.Scanner{},
+		"digitaloceanv2":                   digitaloceanv2.Scanner{},
+		"docker":                           docker.Scanner{},
+		"mongodb":                          mongodb.Scanner{},
+		"ldap":                             ldap.Scanner{},
+		"gcpapplicationdefaultcredentials": gcpapplicationdefaultcredentials.Scanner{},
+		"ftp":                              ftp.Scanner{},
+		"auth0oauth":                       auth0oauth.Scanner{},
+		"artifactory":                      artifactory.Scanner{},
+		"auth0managementapitoken":          auth0managementapitoken.Scanner{},
+		"awssessionkeys":                   awssessionkeys.New(),
+		"awsaccesskeys":                    awsaccesskeys.New(),
+		"azuredirectmanagementkey":         azuredirectmanagementkey.Scanner{},
+		"censys":                           censys.Scanner{},
+		"cloudflareapitoken":               cloudflareapitoken.Scanner{},
+		"cloudflarecakey":                  cloudflarecakey.Scanner{},
+		"digitaloceantoken":                digitaloceantoken.Scanner{},
+		"discordbottoken":                  discordbottoken.Scanner{},
+		"discordwebhook":                   discordwebhook.Scanner{},
+		"dropbox":                          dropbox.Scanner{},
+		"gcp":                              gcp.Scanner{},
+		"generic":                          generic.New(),
+		"githubv1":                         githubv1.Scanner{},
+		"githubv2":                         githubv2.Scanner{},
+		"github_oauth2":                    github_oauth2.Scanner{},
+		"githubapp":                        githubapp.Scanner{},
+		"gitlabv1":                         gitlabv1.Scanner{},
+		"gitlabv2":                         gitlabv2.Scanner{},
+		"herokuv1":                         herokuv1.Scanner{},
+		"herokuv2":                         herokuv2.Scanner{},
+		"jiratokenv1":                      jiratokenv1.Scanner{},
+		"jiratokenv2":                      jiratokenv2.Scanner{},
+		"microsoftteamswebhook":            microsoftteamswebhook.Scanner{},
+		"okta":                             okta.Scanner{},
+		"pastebin":                         pastebin.Scanner{},
+		"privatekey":                       privatekey.Scanner{},
+		"shodankey":                        shodankey.Scanner{},
+		"slack":                            slack.Scanner{},
+		"slackwebhook":                     slackwebhook.Scanner{},
+		"terraformcloudpersonaltoken":      terraformcloudpersonaltoken.Scanner{},
+		"uri":                              uri.Scanner{},
+	}
+)
+
+type IConfig interface {
+	GetCreds() (string, string, string)
+	GetDetectors(detectrs ...string) []detectors.Detector
+	Threadss() int
+}
+
 type Config struct {
-	APIToken string `mapstructure:"api-token"`
-	DCookie  string `mapstructure:"d-cookie"`
-	DSCookie string `mapstructure:"ds-cookie"`
+	APIToken string `mapstructure:"api-token" json:"api_token"`
+	DCookie  string `mapstructure:"d-cookie" json:"d_cookie"`
+	DSCookie string `mapstructure:"ds-cookie" json:"ds_cookie"`
 	// Files       []string `mapstructure:"files"`
-	Domains         []string `mapstructure:"domains"`
-	Detectors       []string `mapstructure:"detectors"`
-	Threads         int
-	CustomDetectors []CustomDetector `mapstructure:"custom-detectors"`
+	Detectors       []string         `mapstructure:"detectors" json:"detectors"`
+	Threads         int              `json:"threads"`
+	CustomDetectors []CustomDetector `mapstructure:"custom-detectors" json:"custom_detectors"`
+}
+
+func (c Config) Threadss() int {
+	return c.Threads
+}
+
+func (c Config) GetCreds() (string, string, string) {
+	return c.APIToken, c.DCookie, c.DSCookie
+}
+
+func (c *Config) SetCreds(token string, dCookie string, dsCookie string) {
+	c.APIToken = token
+	c.DCookie = dCookie
+	c.DSCookie = dsCookie
 }
 
 func (c Config) GetDetectors(detectrs ...string) []detectors.Detector {
-	defaultDetectors := true
-	if len(detectrs) == 0 {
-		detectrs = c.Detectors
-		defaultDetectors = false
+	var selectedDetectors []detectors.Detector
+
+	if len(detectrs) == 0 { // This should mean we should use all builtin and custom detectors
+		for _, detector := range BuiltInDetectors {
+			selectedDetectors = append(selectedDetectors, detector)
+		}
+
+		for _, detector := range c.CustomDetectors {
+			selectedDetectors = append(selectedDetectors, &detector)
+		}
+
+		return selectedDetectors
 	}
 
-	var selectedDetectors []detectors.Detector
 	for _, t := range detectrs {
-		var detector detectors.Detector
-		switch t {
-		case "anthropic":
-			detector = anthropic.Scanner{}
-		case "atlassianv1":
-			detector = atlassianv1.Scanner{}
-		case "atlassianv2":
-			detector = atlassianv2.Scanner{}
-		case "bitbucketapppassword":
-			detector = bitbucketapppassword.Scanner{}
-		case "box":
-			detector = box.Scanner{}
-		case "boxoauth":
-			detector = boxoauth.Scanner{}
-		case "digitaloceanv2":
-			detector = digitaloceanv2.Scanner{}
-		case "docker":
-			detector = docker.Scanner{}
-		case "mongodb":
-			detector = mongodb.Scanner{}
-		case "ldap":
-			detector = ldap.Scanner{}
-		case "gcpapplicationdefaultcredentials":
-			detector = gcpapplicationdefaultcredentials.Scanner{}
-		case "ftp":
-			detector = ftp.Scanner{}
-		case "auth0oauth":
-			detector = auth0oauth.Scanner{}
-		case "artifactory":
-			detector = artifactory.Scanner{}
-		case "auth0managementapitoken":
-			detector = auth0managementapitoken.Scanner{}
-		case "awssessionkeys":
-			detector = awssessionkeys.New()
-		case "awsaccesskeys":
-			detector = awsaccesskeys.New()
-		case "azuredirectmanagementkey":
-			detector = azuredirectmanagementkey.Scanner{}
-		case "censys":
-			detector = censys.Scanner{}
-		case "cloudflareapitoken":
-			detector = cloudflareapitoken.Scanner{}
-		case "cloudflarecakey":
-			detector = cloudflarecakey.Scanner{}
-		case "digitaloceantoken":
-			detector = digitaloceantoken.Scanner{}
-		case "discordbottoken":
-			detector = discordbottoken.Scanner{}
-		case "discordwebhook":
-			detector = discordwebhook.Scanner{}
-		case "dropbox":
-			detector = dropbox.Scanner{}
-		case "gcp":
-			detector = gcp.Scanner{}
-		case "generic":
-			detector = generic.New()
-		case "githubv1":
-			detector = githubv1.Scanner{}
-		case "githubv2":
-			detector = githubv2.Scanner{}
-		case "github_oauth2":
-			detector = github_oauth2.Scanner{}
-		case "githubapp":
-			detector = githubapp.Scanner{}
-		case "gitlabv1":
-			detector = gitlabv1.Scanner{}
-		case "gitlabv2":
-			detector = gitlabv2.Scanner{}
-		case "herokuv1":
-			detector = herokuv1.Scanner{}
-		case "herokuv2":
-			detector = herokuv2.Scanner{}
-		case "jiratokenv1":
-			detector = jiratokenv1.Scanner{}
-		case "jiratokenv2":
-			detector = jiratokenv2.Scanner{}
-		case "microsoftteamswebhook":
-			detector = microsoftteamswebhook.Scanner{}
-		case "okta":
-			detector = okta.Scanner{}
-		case "pastebin":
-			detector = pastebin.Scanner{}
-		case "privatekey":
-			detector = privatekey.Scanner{}
-		case "shodankey":
-			detector = shodankey.Scanner{}
-		case "slack":
-			detector = slack.Scanner{}
-		case "slackwebhook":
-			detector = slackwebhook.Scanner{}
-		case "terraformcloudpersonaltoken":
-			detector = terraformcloudpersonaltoken.Scanner{}
-		case "uri":
-			detector = uri.Scanner{}
-		default:
-			if !defaultDetectors && len(c.CustomDetectors) != 0 {
-				for _, d := range c.CustomDetectors {
-					if strings.EqualFold(d.Name, t) {
-						selectedDetectors = append(selectedDetectors, &d)
-						break
-					}
+		detector, ok := BuiltInDetectors[t]
+		if !ok && len(c.CustomDetectors) != 0 {
+			for _, d := range c.CustomDetectors {
+				if strings.EqualFold(d.Name, t) {
+					detector = &d
+					break
 				}
 			}
 		}
 
 		if detector != nil {
 			selectedDetectors = append(selectedDetectors, detector)
-		}
-	}
-
-	if defaultDetectors && len(c.CustomDetectors) != 0 {
-		for _, d := range c.CustomDetectors {
-			selectedDetectors = append(selectedDetectors, &d)
 		}
 	}
 

@@ -1,15 +1,22 @@
 # Slack-Slurp
-What is slack-slurp? Slack-slurp is a pentesting social post-exploitation tool for slack. It uses Slack's API to search through messages and [trufflehog's](https://github.com/trufflesecurity/trufflehog) secrets detectors to slurp up any juicy information. This is a work in progress and more is surely to come. Features, bug reports, and pull requests and very much welcome! I am a better coder than I am documenter so I apologize for the lack of documentation.
+
+Slack-Slurp is a pentesting/post-exploitation tool for Slack. It uses Slack's API to search through messages, files, users, and channels, and uses [TruffleHog's](https://github.com/trufflesecurity/trufflehog) secret detectors to find exposed credentials and sensitive data.
+
+It can be used as a CLI tool or via its built-in web dashboard.
+
+Licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
 ## Authentication
-Since `slack-slurp` mainly uses Slack's API, authentication tokens are required to use the tool. If a normal user's credentials or session were stolen, two tokens are required. Only one token is required if a slack bot token was retrieved, though the tool might not fully work depending on the permissions of the token.
+
+Since `slack-slurp` uses Slack's API, authentication tokens are required. Two tokens are needed when using stolen user credentials. Only one token is required for a bot token, though some features may be limited depending on the bot's permissions.
 
 ### As a normal user
-The first required token for authenticating as a normal user is the value of the `d` cookie which starts with `xoxd-`. This cookie is set to HTTPOnly so the cookie must be retrieved manually. Log in to Slack using a web browser, then search for the `d` cookie using the browser's developer tools.
+
+The first token is the value of the `d` cookie, which starts with `xoxd-`. This cookie is HTTPOnly so it must be retrieved manually. Log in to Slack in a browser, then find the `d` cookie in the browser's developer tools.
 
 ![D Cookie](res/Slack-d-Cookie.png)
 
-The second required token is what I am calling the workspace API token which starts with `xoxc-`. To get this token, run the following JavaScript in the web browser's console window
+The second token is the workspace API token, which starts with `xoxc-`. Retrieve it by running the following in the browser console:
 ```js
 var localConfig = JSON.parse(localStorage.localConfig_v2)
 localConfig.teams[localConfig.lastActiveTeamId].token
@@ -17,103 +24,124 @@ localConfig.teams[localConfig.lastActiveTeamId].token
 
 ![Workspace API Token](res/Workspace-Token.png)
 
-#### **Troubleshooting**
-If you run into authentication issues via `slack-slurp`, you might need to grab the `d-s` cookie value as shown here.
+#### Troubleshooting
+
+If you encounter authentication issues, you may also need the `d-s` cookie value:
 
 ![D-S Cookie](res/Slack-d-s-Cookie.png)
 
-This value seems to be a timestamp for the `d` cookie and sometimes is required. 
+This is a timestamp value tied to the `d` cookie and is only sometimes required.
 
 ### As a bot
-The only thing required to authenticate as a bot is the bot API token with starts with `xoxb-`. Depending on the scopes assigned to the bot, `slack-slurp` may not work.
 
-## Trufflehog Detectors
-To have pretty robust secret slurping, I opted to use trufflehog's [detectors](https://github.com/trufflesecurity/trufflehog/tree/main/pkg/detectors). There are a myriad of secret detectors used within trufflehog. These are well tested, offer ways to verify the found secrets, and cover a very wide range of commonly used services. Currently only the following detectors are supported within `slack-slurp`:
+Only the bot token (starting with `xoxb-`) is required. Functionality may be limited depending on the bot's assigned scopes.
 
-- auth0managementapitoken
-- aws
-- azure
-- censys
-- cloudflareapitoken
-- cloudflarecakey
-- digitaloceantoken
-- discordbottoken
-- discordwebhook
-- dropbox
-- gcp
-- generic
-- github
-- github_old
-- githubapp
-- gitlab
-- gitlabv2
-- heroku
-- jiratoken
-- microsoftteamswebhook
-- okta
-- pastebin
-- privatekey
-- shodankey
-- slack
-- slackwebhook
-- terraformcloudpersonaltoken
-- uri
+---
 
-### Custom Detectors
-Custom secret detectors can be added to the config file. The custom detectors just require a name, a keyword list, and regex patterns and look like the following:
-```yaml
-custom-detectors:
-  - name: "Custom Detector"
-    keywords:
-      - pass
-      - api
-    patterns:
-      - password\s*=\s*(.*)$
-      - api_key\s*=\s*(.*)$
+## Enterprise Slack Warning
+
+If the target Slack tenant is running **Slack Enterprise Grid**, exercise extreme caution. Enterprise deployments have enhanced security monitoring and audit logging that standard workspaces do not.
+
+If Slack detects activity it considers suspicious, the consequences can be immediate and severe:
+- The compromised user account will be **logged out of all sessions**
+- The user will receive an **email notification** about the suspicious activity
+- Slack workspace **admins will be alerted** via Slack messages and/or email
+
+Some features may also behave differently or fail entirely on Enterprise tenants. For example, enterprise users are often restricted from listing channels, which means channel names may not resolve in search results.
+
+---
+
+## Web Dashboard
+
+The web dashboard provides a graphical interface for all of `slack-slurp`'s functionality.
+
+### Starting the server
+
+```
+slack-slurp server
+slack-slurp server -p 9000   # custom port (default: 8000)
 ```
 
+Then open `http://localhost:8000` in a browser.
+
+### Features
+
+#### Profiles
+Manage multiple sets of Slack credentials. Each profile stores an API token, `d` cookie, and optional `d-s` cookie. Switch the active profile at any time without restarting the server.
+
+#### Search
+Search Slack messages and/or files in real time.
+- Choose to search messages, files, or both simultaneously
+- Filter by channel, user, and date range
+- Specify file types when searching files
+- Results stream in via WebSocket as they are found
+- Filter displayed results by content, user, channel, or file type
+- Stop a search mid-run
+- Export results to JSON
+
+#### Secrets Scan
+Scan messages for secrets using TruffleHog detectors.
+- Select which built-in and custom detectors to use
+- Filter scope by channel, user, and date range
+- Optional secret verification against live services
+- Show only verified secrets
+- Mark individual findings as false positives
+- Hide/show false positives
+- Stop a scan mid-run
+- Export all findings or only non-false-positive findings to JSON
+
+#### Channels
+Browse all channels accessible to the active profile, including public channels, private channels, direct messages, and group messages.
+
+#### Users
+Browse all users in the workspace.
+
+#### Domains
+Search for messages containing configured domain patterns and extract matching domain/subdomain references.
+
+#### URLs
+Extract all URLs found in Slack messages.
+
+#### Settings
+Three-tab settings panel:
+
+- **Profiles** — Create, edit, and delete authentication profiles
+- **Custom Detectors** — Create, edit, and delete custom secret detectors using keywords and regex patterns
+- **Global Search Options** — Configure the number of concurrent goroutines used during searches (default: 10)
+
+---
+
 ## CLI
+
 ### Installation
-The `slack-slurp` CLI requires go1.19+ to install successfully. Run the following command to install the CLI:
+
+Requires Go 1.19+:
 ```
 go install github.com/NoF0rte/slack-slurp@latest
 ```
 
 ### Config
-The `.slack-slurp.yaml` config file contains the various configurable settings for `slack-slurp`
+
+> **Note:** The config file is only needed when using `slack-slurp` as a CLI tool. When using the web dashboard, credentials and settings are managed through the Settings page instead.
+
+The `.slack-slurp.yaml` config file holds credentials and default settings for CLI usage:
 ```yaml
 api-token: ""
 d-cookie: ""
 ds-cookie: ""
 detectors:
-    - auth0managementapitoken
     - aws
     - azure
-    - censys
-    - cloudflareapitoken
-    - cloudflarecakey
-    - digitaloceantoken
-    - discordbottoken
-    - discordwebhook
-    - dropbox
-    - gcp
-    - generic
     - github
     - github_old
     - githubapp
     - gitlab
     - gitlabv2
-    - heroku
-    - jiratoken
-    - microsoftteamswebhook
-    - okta
-    - pastebin
+    - generic
     - privatekey
-    - shodankey
     - slack
     - slackwebhook
-    - terraformcloudpersonaltoken
-    - uri
+    # ... (see Detectors section for the full list)
 custom-detectors: []
 domains: []
 ```
@@ -197,94 +225,233 @@ slack-slurp channels -T direct -T group
 #### Secrets
 #### Users
 
-## Library
-### Installation
-Run the following command to install the module in your application:
-```
-go get github.com/NoF0rte/slack-slurp@latest
-```
-Then use the following to import it:
-```golang
-import "github.com/NoF0rte/slack-slurp/pkg/slurp"
-```
-### Slurp Client
-To create a slurp client (slurper), only the authentication tokens are required
-```golang
-cfg := slurp.Config{
-    APIToken:  "xoxc-xxxxxxx",
-    DCookie: "xoxd-xxxxxxx",
-}
+| Field | Description |
+|-------|-------------|
+| `api-token` | User token (`xoxc-`) or bot token (`xoxb-`) |
+| `d-cookie` | Value of the `d` cookie. Not required for bot tokens. |
+| `ds-cookie` | Value of the `d-s` cookie. Sometimes required for user auth. |
+| `detectors` | TruffleHog detectors to use for secret scanning. See [Detectors](#detectors). |
+| `custom-detectors` | Custom regex-based detectors. See [Custom Detectors](#custom-detectors). |
+| `domains` | Domain patterns for the `domains` command. |
 
-slurper = slurp.New(&cfg)
+Generate a default config file:
 ```
-Optionally the default domains to slurp and secret detectors can be set via:
-```golang
-cfg := slurp.Config{
-    APIToken:  "xoxc-xxxxxxx",
-    DCookie: "xoxd-xxxxxxx",
-    Domains: []string{
-        "company.com",
-        ".local",
-    },
-    Detectors: []string{
-        "aws",
-        "generic",
-        "github",
-        "github_old",
-        "githubapp",
-        "gitlab",
-        "gitlabv2",
-        "heroku",
-        "jiratoken",
-        "microsoftteamswebhook",
-        "okta",
-    }
-}
-
-slurper = slurp.New(&cfg)
+slack-slurp config -s
 ```
 
-### Searching
-#### Messages
-To search Slack messages, the `SearchMessages(query)` and `SearchMessagesAsync(query)` methods can be used. The `SearchMessages` method will only return all messages containing the query once all results have been retrieved.
+### Global flags
 
-```golang
-messages, err := slurper.SearchMessages("my first query")
-if err != nil {
-    panic(err)
-}
-
-for _, message := range messages {
-    fmt.Println(message)
-}
 ```
-The `SearchMessagesAsync` method is the same as `SearchMessages` except it sends each message as it is found through the returned channel.
-```golang
-messageChan, errorChan := slurper.SearchMessagesAsync("my first query")
-
-Loop:
-for {
-    select {
-    case message, ok := <-messageChan:
-        if !ok {
-            break Loop
-        }
-
-        fmt.Println(message)
-
-    case err = <-errorChan:
-        close(messageChan)
-    }
-}
-close(errorChan)
+--config string      Config file path (default: $HOME/.slack-slurp.yaml)
+-c, --cookie string      Slack d cookie (xoxd-...)
+    --ds-cookie string   Slack d-s cookie
+-t, --token string       Slack API token (xoxc-... or xoxb-...)
+    --threads int        Number of concurrent threads (default: 10)
 ```
-#### Files
 
-### Get Channels
+### Commands
 
-### Get Users
+#### `whoami`
+Test credentials and display the current user.
+```
+$ slack-slurp whoami
+[+] Current user: example.user
+```
 
-### Slurp Secrets
+#### `channels`
+List channels accessible to the current user. Includes public/private channels and direct/group messages by default. Output is saved to `slurp-channels.json`.
 
-### Slurp Domains
+```
+# Print to stdout instead of file
+slack-slurp channels -o -
 
+# Only private channels
+slack-slurp channels -T private
+
+# Direct messages and group messages only
+slack-slurp channels -T direct -T group
+```
+
+Flags:
+```
+-T, --type strings    Channel types to return: public, private, direct, group
+-o, --output string   Output file (default: slurp-channels.json)
+```
+
+#### `search messages`
+Search Slack messages matching a query.
+```
+slack-slurp search messages "password"
+slack-slurp search messages "api_key" -C general -C dev
+slack-slurp search messages "secret" --after 2024-01-01 --before 2024-06-01
+```
+
+#### `search files`
+Search Slack files matching a query.
+```
+slack-slurp search files "credentials"
+slack-slurp search files "config" -f pdf -f txt
+```
+
+Flags:
+```
+-f, --file-types strings   File types to filter by
+```
+
+#### `search`
+Run both message and file searches for a query simultaneously.
+```
+slack-slurp search "password"
+```
+
+Shared search flags (available on `search`, `search messages`, `search files`):
+```
+-C, --channels strings   Limit search to specific channels
+-U, --users strings      Limit search to specific users (by username)
+    --before string      Only return results before this date (YYYY-MM-DD)
+    --after string       Only return results after this date (YYYY-MM-DD)
+```
+
+#### `secrets`
+Scan Slack messages for secrets using TruffleHog detectors. Results are written to `slurp-secrets.json` and printed to stdout.
+```
+slack-slurp secrets
+slack-slurp secrets -V                          # verify found secrets
+slack-slurp secrets --verified                  # only output verified secrets
+slack-slurp secrets -d aws -d github            # use specific detectors
+slack-slurp secrets -C general -C engineering   # limit to specific channels
+```
+
+Flags:
+```
+-o, --output string      Output file (default: slurp-secrets.json)
+-V, --verify             Verify found secrets against live services
+    --verified           Only output verified secrets (implies -V)
+-d, --detectors strings  Detectors to use (overrides config file)
+-C, --channels strings   Limit scan to specific channels
+```
+
+#### `users`
+Fetch all workspace users and write to `slurp-users.json`.
+```
+slack-slurp users
+slack-slurp users -o my-users.json
+```
+
+Flags:
+```
+-o, --output string   Output file (default: slurp-users.json)
+```
+
+#### `domains`
+Search messages for references to configured domain patterns and output matching results to `slurp-domains.txt`.
+```
+slack-slurp domains
+slack-slurp domains -d example.com -d .internal
+slack-slurp domains --after 2024-01-01 -C engineering
+```
+
+Flags:
+```
+-o, --output string      Output file (default: slurp-domains.txt)
+-d, --domains strings    Domains/subdomains to search for (overrides config file)
+-C, --channels strings   Limit search to specific channels
+-U, --users strings      Limit search to specific users
+    --before string      Only return results before this date (YYYY-MM-DD)
+    --after string       Only return results after this date (YYYY-MM-DD)
+```
+
+#### `urls`
+Extract all URLs found in Slack messages and write to `slurp-urls.txt`.
+```
+slack-slurp urls
+slack-slurp urls -C general --after 2024-01-01
+```
+
+Flags:
+```
+-o, --output string      Output file (default: slurp-urls.txt)
+-C, --channels strings   Limit search to specific channels
+-U, --users strings      Limit search to specific users
+    --before string      Only return results before this date (YYYY-MM-DD)
+    --after string       Only return results after this date (YYYY-MM-DD)
+```
+
+#### `server`
+Start the web dashboard server.
+```
+slack-slurp server
+slack-slurp server -p 9000
+```
+
+Flags:
+```
+-p, --port string   Port to listen on (default: 8000)
+```
+
+#### `config`
+Display current config values.
+```
+slack-slurp config
+slack-slurp config -s   # save default config to .slack-slurp.yaml
+```
+
+---
+
+## Detectors
+
+`slack-slurp` uses TruffleHog's [detectors](https://github.com/trufflesecurity/trufflehog/tree/main/pkg/detectors) for secret scanning. The following built-in detectors are supported:
+
+- `auth0managementapitoken`
+- `aws`
+- `azure`
+- `censys`
+- `cloudflareapitoken`
+- `cloudflarecakey`
+- `digitaloceantoken`
+- `discordbottoken`
+- `discordwebhook`
+- `dropbox`
+- `gcp`
+- `generic`
+- `github`
+- `github_old`
+- `githubapp`
+- `gitlab`
+- `gitlabv2`
+- `heroku`
+- `jiratoken`
+- `microsoftteamswebhook`
+- `okta`
+- `pastebin`
+- `privatekey`
+- `shodankey`
+- `slack`
+- `slackwebhook`
+- `terraformcloudpersonaltoken`
+- `uri`
+
+### Custom Detectors
+
+Custom detectors can be defined in the config file (for CLI use) or via the Settings page in the web dashboard. Each detector requires a name, one or more keywords, and one or more regex patterns:
+
+```yaml
+custom-detectors:
+  - name: "Custom Detector"
+    keywords:
+      - pass
+      - api
+    patterns:
+      - password\s*=\s*(.*)$
+      - api_key\s*=\s*(.*)$
+```
+
+Slack messages are first filtered by keyword before the regex patterns are applied.
+
+---
+
+## Known Issues
+
+- **Duplicate secret results** — The secrets scanner may return duplicate findings for the same secret across different messages.
+- **Slack mention tags in secret matches** — Slack user mentions (`@SLACK_ID|username`) can appear inside matched secret strings, producing false or malformed results.
+- **Channel IDs missing from search output** — Message and file search results do not currently include the channel ID. This is a problem on Enterprise tenants where listing channels is restricted and channel names cannot be resolved.

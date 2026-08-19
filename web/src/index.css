@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slack-purple: #4A154B;
+  --color-slack-dark: #1D1C1D;
+  --color-slack-gray: #616061;
+  --color-slack-lightgray: #F8F8F8;
+  --color-slack-blue: #1264A3;
+  --color-slack-green: #2EB67D;
+  --color-slack-yellow: #ECB22E;
+  --color-slack-red: #E01E5A;
+  
+  --font-family-slack: 'Lato', 'Helvetica Neue', 'Helvetica', sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-family-slack);
+    background-color: var(--color-slack-dark);
+    color: #ffffff;
+  }
+  
+  /* Ensure proper word wrapping for all text content */
+  * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  
+  /* Prevent horizontal overflow */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+}
+
+@layer components {
+  /* Custom components can be added here if needed */
+}

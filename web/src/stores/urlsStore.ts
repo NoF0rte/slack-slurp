@@ -1,0 +1,178 @@
+import { create } from 'zustand'
+import { URLSearchRequest, URLSearchResponse } from '../types/api'
+import { api } from '../utils/api'
+import { wsManager } from '../utils/websocket'
+
+interface URLsState {
+  results: string[]
+  isLoading: boolean
+  isSearching: boolean
+  dismissComplete: boolean
+  error: string | null
+  currentSearch: URLSearchResponse | null
+  
+  // Form state
+  selectedChannels: string[]
+  selectedUsers: string[]
+  beforeDate: string
+  afterDate: string
+  
+  // Actions
+  searchURLs: (request: URLSearchRequest) => Promise<void>
+  clearResults: () => void
+  clearError: () => void
+  stopSearch: () => void
+  setSelectedChannels: (channels: string[]) => void
+  setSelectedUsers: (users: string[]) => void
+  setBeforeDate: (date: string) => void
+  setAfterDate: (date: string) => void
+  clearForm: () => void
+}
+
+export const useURLsStore = create<URLsState>((set, get) => ({
+  results: [],
+  isLoading: false,
+  isSearching: false,
+  error: null,
+  currentSearch: null,
+  dismissComplete: false,
+  
+  // Form state
+  selectedChannels: [],
+  selectedUsers: [],
+  beforeDate: '',
+  afterDate: '',
+
+  searchURLs: async (request: URLSearchRequest) => {
+    set({ isLoading: true, error: null, isSearching: true })
+    
+    try {
+      // Clear previous results
+      set({ results: [] })
+      
+      // Start WebSocket connection if not already connected
+      if (!wsManager.isConnected()) {
+        await wsManager.connect()
+      }
+      
+      // Set up WebSocket listeners
+      const handleURLResult = (id: string, data: string) => {
+        const currentSearch = get().currentSearch
+        if (!currentSearch || currentSearch.searchId != id) {
+          return
+        }
+
+        set(state => ({
+          results: [...state.results, data]
+        }))
+      }
+      
+      const handleComplete = (id: string) => {
+        const state = get()
+        const currentSearch = state.currentSearch
+        if (!currentSearch || currentSearch.searchId != id) {
+          return
+        }
+
+        set({
+          isSearching: false,
+          isLoading: false,
+          currentSearch: currentSearch ? {
+            searchId: currentSearch.searchId,
+            status: 'completed' as const,
+            totalFound: state.results.length
+          } : null
+        })
+        
+        // Clean up listeners
+        wsManager.off('urlResult', handleURLResult)
+        wsManager.off('complete', handleComplete)
+        wsManager.off('error', handleError)
+      }
+      
+      const handleError = (id: string, data: any) => {
+        const currentSearch = get().currentSearch
+        if (!currentSearch || currentSearch.searchId != id) {
+          return
+        }
+
+        set({
+          error: data.message || 'Search failed',
+          isLoading: false,
+          isSearching: false
+        })
+        
+        // Clean up listeners
+        wsManager.off('urlResult', handleURLResult)
+        wsManager.off('complete', handleComplete)
+        wsManager.off('error', handleError)
+      }
+      
+      // Add listeners
+      wsManager.on('urlResult', handleURLResult)
+      wsManager.on('complete', handleComplete)
+      wsManager.on('error', handleError)
+      
+      // Start the search
+      const response = await api.post('/search/urls', request)
+      const searchResponse: URLSearchResponse = response.data
+      
+      set({
+        currentSearch: searchResponse,
+      })
+      
+    } catch (error: any) {
+      set({
+        error: error.response?.data?.error || error.message,
+        isLoading: false,
+        isSearching: false
+      })
+    }
+  },
+
+  clearResults: () => {
+    set({ results: [] })
+  },
+
+  clearError: () => {
+    set({ error: null })
+  },
+
+  stopSearch: () => {
+    const currentSearch = get().currentSearch
+    if (currentSearch) {
+      // Send stop request to backend
+      api.post(`/search/stop/${currentSearch.searchId}`).catch(console.error)
+    }
+    
+    set({
+      isSearching: false,
+      isLoading: false
+    })
+  },
+
+  setSelectedChannels: (channels: string[]) => {
+    set({ selectedChannels: channels })
+  },
+
+  setSelectedUsers: (users: string[]) => {
+    set({ selectedUsers: users })
+  },
+
+  setBeforeDate: (date: string) => {
+    set({ beforeDate: date })
+  },
+
+  setAfterDate: (date: string) => {
+    set({ afterDate: date })
+  },
+
+  clearForm: () => {
+    set({
+      selectedChannels: [],
+      selectedUsers: [],
+      beforeDate: '',
+      afterDate: ''
+    })
+  },
+}))
